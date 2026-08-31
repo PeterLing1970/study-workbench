@@ -1577,6 +1577,7 @@ button { color: inherit; }
   font-size: 11.5px;
   color: #777;
 }
+.print-output-only { display: none; }
 .empty-print-state {
   display: flex;
   flex-direction: column;
@@ -1594,18 +1595,39 @@ button { color: inherit; }
 }
 
 @media print {
+  html,
+  body,
+  #root,
+  .app-shell,
+  .app-main,
+  .wq-view-container {
+    width: 100% !important;
+    min-height: 0 !important;
+    height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    background: white !important;
+  }
   body * {
     visibility: hidden;
+  }
+  .wq-view-container > :not(.print-modal-overlay) {
+    display: none !important;
   }
   .no-print, .navigation, .app-header, .upload-panel, .wq-filter-control-panel, .list-heading {
     display: none !important;
   }
   .print-modal-overlay {
+    display: block !important;
     position: static !important;
     background: transparent !important;
     padding: 0 !important;
+    animation: none !important;
+    backdrop-filter: none !important;
   }
   .print-modal-sheet {
+    display: block !important;
     position: static !important;
     max-width: 100% !important;
     max-height: none !important;
@@ -1614,6 +1636,8 @@ button { color: inherit; }
     border: none !important;
     box-shadow: none !important;
     background: transparent !important;
+    animation: none !important;
+    transform: none !important;
   }
   .printable-paper-wrapper {
     background: transparent !important;
@@ -1623,9 +1647,9 @@ button { color: inherit; }
     visibility: visible !important;
   }
   .printable-paper {
-    position: absolute;
-    left: 0;
-    top: 0;
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
     width: 100% !important;
     min-height: auto !important;       /* 屏幕预览用的是 297mm，打印别再加一层 */
     margin: 0 !important;
@@ -1635,7 +1659,76 @@ button { color: inherit; }
     background: white !important;
   }
   .paper-question-card {
-    page-break-inside: avoid !important;
+    break-inside: auto !important;
+    page-break-inside: auto !important;
+  }
+  .print-preview-only { display: none !important; }
+  .print-output-only { display: block !important; }
+  .paper-header {
+    padding-bottom: 10px;
+    margin-bottom: 16px;
+  }
+  .paper-meta-top {
+    gap: 16px;
+    margin-bottom: 9px;
+    font-size: 10.5pt;
+  }
+  .paper-title { font-size: 18pt; }
+  .paper-questions-list { gap: 18px; }
+  .paper-question-card { padding-bottom: 16px; }
+  .paper-q-image-box {
+    max-width: 100%;
+    margin: 8px auto 12px;
+    text-align: center;
+  }
+  .paper-q-image { max-height: 82mm; }
+  .paper-answer-blank {
+    min-height: 56mm;
+    margin-top: 12px;
+  }
+  .paper-footer {
+    margin-top: 18px;
+    padding-top: 10px;
+  }
+  .paper-question-card + .paper-question-card {
+    break-before: page;
+    page-break-before: always;
+  }
+  .paper-header,
+  .paper-q-header,
+  .paper-q-title,
+  .paper-review-tags,
+  .paper-answer-blank,
+  .paper-q-image-box,
+  .paper-review-content table,
+  .paper-review-content blockquote,
+  .paper-review-content .katex-display {
+    break-inside: avoid;
+  }
+  .paper-q-header,
+  .paper-q-title,
+  .paper-review-tags {
+    break-after: avoid;
+  }
+  .paper-review-content,
+  .paper-summary-snippet {
+    font-size: 10.5pt;
+    line-height: 1.55;
+  }
+  .paper-review-content p,
+  .paper-review-content ul,
+  .paper-review-content ol,
+  .paper-summary-snippet p {
+    margin-bottom: 6px;
+  }
+  .paper-review-content table {
+    margin: 7px 0 10px;
+    font-size: 9.5pt;
+    line-height: 1.4;
+  }
+  .paper-review-content th,
+  .paper-review-content td {
+    padding: 5px 7px;
   }
 }
 
