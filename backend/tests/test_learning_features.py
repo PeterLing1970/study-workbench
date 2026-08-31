@@ -50,7 +50,12 @@ class FeatureMigrationTests(unittest.TestCase):
         engine = create_engine("sqlite+pysqlite:///:memory:")
         with engine.begin() as connection:
             connection.execute(text("CREATE TABLE study_tasks (id INTEGER PRIMARY KEY)"))
-            connection.execute(text("CREATE TABLE wrong_questions (id INTEGER PRIMARY KEY)"))
+            connection.execute(text("CREATE TABLE wrong_questions (id INTEGER PRIMARY KEY, title VARCHAR(160))"))
+            connection.execute(text("CREATE TABLE exam_scores (id INTEGER PRIMARY KEY, exam_name VARCHAR(120))"))
+            connection.execute(
+                text("INSERT INTO exam_scores (exam_name) VALUES (:first), (:second), (:third)"),
+                {"first": "七月期末摸底", "second": "八月阶段测验", "third": "九月月考"},
+            )
             connection.execute(text("CREATE TABLE weekly_reports (id INTEGER PRIMARY KEY)"))
 
         ensure_feature_schema(engine)
@@ -60,6 +65,10 @@ class FeatureMigrationTests(unittest.TestCase):
         self.assertTrue({"review_count", "next_review_date"}.issubset(
             {column["name"] for column in inspector.get_columns("wrong_questions")}
         ))
+        self.assertIn("is_demo", {column["name"] for column in inspector.get_columns("exam_scores")})
+        with engine.connect() as connection:
+            remaining_exams = list(connection.execute(text("SELECT exam_name FROM exam_scores ORDER BY exam_name")).scalars())
+        self.assertEqual(remaining_exams, ["九月月考"])
         self.assertTrue({"schema_version", "generated_by_ai"}.issubset(
             {column["name"] for column in inspector.get_columns("weekly_reports")}
         ))

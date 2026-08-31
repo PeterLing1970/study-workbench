@@ -127,6 +127,7 @@ export function WrongQuestionsView({
                 <div>
                   <div className="wrong-meta">
                     <span>{item.subject}</span>
+                    {item.is_demo ? <span className="demo-data-badge">演示数据</span> : null}
                     <span className={`wq-status-badge wq-status-${item.review_status}`}>{item.review_status}</span>
                     {isDue ? <span className="wq-due-badge"><BellRing size={11} /> 今日到期复习</span> : null}
                     <time>{new Date(item.created_at).toLocaleDateString('zh-CN')}</time>

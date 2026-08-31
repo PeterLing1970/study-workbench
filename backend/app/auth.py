@@ -47,26 +47,38 @@ def normalize_username(username: str) -> str:
 
 
 def ensure_user_role_schema(engine: Engine) -> None:
-    columns = {column["name"] for column in inspect(engine).get_columns("users")}
-    if "role" not in columns:
-        with engine.begin() as connection:
+    with engine.begin() as connection:
+        columns = {column["name"] for column in inspect(connection).get_columns("users")}
+        if "role" not in columns:
             connection.execute(text("ALTER TABLE users ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'student'"))
 
 
 def ensure_feature_schema(engine: Engine) -> None:
     """为 5-8 阶段新增字段/表做幂等迁移（create_all 只建新表，不给已有表加列）。"""
     with engine.begin() as connection:
-        task_columns = {column["name"] for column in inspect(engine).get_columns("study_tasks")}
+        inspector = inspect(connection)
+        task_columns = {column["name"] for column in inspector.get_columns("study_tasks")}
         if "template_id" not in task_columns:
             connection.execute(text("ALTER TABLE study_tasks ADD COLUMN template_id INTEGER"))
 
-        wq_columns = {column["name"] for column in inspect(engine).get_columns("wrong_questions")}
+        wq_columns = {column["name"] for column in inspector.get_columns("wrong_questions")}
         if "review_count" not in wq_columns:
             connection.execute(text("ALTER TABLE wrong_questions ADD COLUMN review_count INTEGER NOT NULL DEFAULT 0"))
         if "next_review_date" not in wq_columns:
             connection.execute(text("ALTER TABLE wrong_questions ADD COLUMN next_review_date DATE"))
+        if "is_demo" not in wq_columns:
+            connection.execute(text("ALTER TABLE wrong_questions ADD COLUMN is_demo BOOLEAN NOT NULL DEFAULT FALSE"))
+            connection.execute(text("UPDATE wrong_questions SET is_demo = TRUE WHERE title IN ('二次函数最值题', '串并联电路判断')"))
 
-        report_columns = {column["name"] for column in inspect(engine).get_columns("weekly_reports")}
+        score_columns = {column["name"] for column in inspector.get_columns("exam_scores")}
+        if "is_demo" not in score_columns:
+            connection.execute(text("ALTER TABLE exam_scores ADD COLUMN is_demo BOOLEAN NOT NULL DEFAULT FALSE"))
+        connection.execute(
+            text("DELETE FROM exam_scores WHERE exam_name IN (:july_exam, :august_exam)"),
+            {"july_exam": "七月期末摸底", "august_exam": "八月阶段测验"},
+        )
+
+        report_columns = {column["name"] for column in inspector.get_columns("weekly_reports")}
         if "schema_version" not in report_columns:
             connection.execute(text("ALTER TABLE weekly_reports ADD COLUMN schema_version INTEGER NOT NULL DEFAULT 1"))
         if "generated_by_ai" not in report_columns:

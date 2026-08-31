@@ -43,6 +43,7 @@ export interface WrongQuestion {
   review_status: string
   review_count: number
   next_review_date: string | null
+  is_demo: boolean
   created_at: string
 }
 
@@ -53,6 +54,7 @@ export interface Score {
   subject: string
   score: number
   full_score: number
+  is_demo: boolean
 }
 
 export interface ScoreTrendPoint {

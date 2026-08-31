@@ -47,6 +47,7 @@ class WrongQuestion(Base):
     review_status: Mapped[str] = mapped_column(String(20), default="待复习")
     review_count: Mapped[int] = mapped_column(Integer, default=0)
     next_review_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True, default=None)
+    is_demo: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
@@ -59,6 +60,7 @@ class ExamScore(Base):
     subject: Mapped[str] = mapped_column(String(20), index=True)
     score: Mapped[int] = mapped_column(Integer)
     full_score: Mapped[int] = mapped_column(Integer)
+    is_demo: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 class FocusRecord(Base):

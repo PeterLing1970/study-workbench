@@ -1331,6 +1331,22 @@ button.parent-insight { cursor: pointer; }
 .weekly-report-header h2 { margin: 0 0 4px; font-size: 24px; color: var(--ink); }
 .report-date-range { margin: 0; color: var(--muted); font-size: 13px; }
 .report-data-notice { margin: 0 0 16px; padding: 11px 13px; border: 1px solid rgba(196, 135, 60, 0.32); border-radius: 12px; background: #fffaf1; color: #81551e; font-size: 13px; line-height: 1.55; }
+.demo-data-badge { display: inline-flex; align-items: center; padding: 2px 7px; border-radius: 999px; background: #fff4d9; color: #8a611e; font-size: 10px; font-weight: 700; line-height: 1.4; vertical-align: middle; }
+
+.score-empty-state {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 20px;
+  padding: 22px;
+  border: 1px dashed var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  color: var(--muted);
+}
+.score-empty-state svg { flex: 0 0 auto; color: var(--primary); }
+.score-empty-state strong { display: block; margin-bottom: 4px; color: var(--text); }
+.score-empty-state p { margin: 0; line-height: 1.6; }
 
 .report-stats-grid {
   display: grid;

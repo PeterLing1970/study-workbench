@@ -41,6 +41,7 @@ export function ScoresView({ scores, loading, onScoreAdded }: ScoresViewProps) {
 
   const total = activeScores.reduce((sum, item) => sum + item.score, 0)
   const fullTotal = activeScores.reduce((sum, item) => sum + item.full_score, 0)
+  const activeIsDemo = activeScores.some((item) => item.is_demo)
 
   // Diagnostics: find weak subjects (< 80% rate)
   const weakSubjects = activeScores.filter((item) => {
@@ -121,8 +122,18 @@ export function ScoresView({ scores, loading, onScoreAdded }: ScoresViewProps) {
         </form>
       ) : null}
 
+      {!loading && scores.length === 0 ? (
+        <div className="score-empty-state" role="status">
+          <LineChart size={28} aria-hidden="true" />
+          <div>
+            <strong>还没有真实成绩</strong>
+            <p>点击“录入成绩”添加第一次考试，之后这里会自动生成总分、弱科诊断和趋势图。</p>
+          </div>
+        </div>
+      ) : null}
+
       {/* Multi-exam Trend Chart */}
-      <div className="trend-section">
+      {scores.length > 0 ? <div className="trend-section">
         <div className="section-heading-row">
           <h2 className="section-heading-with-icon">
             <TrendingUp size={20} /> 各科得分率走势
@@ -136,7 +147,7 @@ export function ScoresView({ scores, loading, onScoreAdded }: ScoresViewProps) {
           </button>
         </div>
         {showTrend ? <ScoreTrendChart /> : null}
-      </div>
+      </div> : null}
 
       {/* Weak Subjects Diagnostics */}
       {weakSubjects.length > 0 ? (
@@ -163,25 +174,25 @@ export function ScoresView({ scores, loading, onScoreAdded }: ScoresViewProps) {
         </div>
       ) : null}
 
-      <section className="score-summary" aria-label="考试总分">
+      {scores.length > 0 ? <section className="score-summary" aria-label="考试总分">
         <div>
-          <span>{activeExamName}</span>
+          <span>{activeExamName} {activeIsDemo ? <b className="demo-data-badge">演示数据</b> : null}</span>
           <strong>{total}<small> / {fullTotal || 800}</small></strong>
         </div>
         <div className="score-rate">
           <span>得分率</span>
           <strong>{fullTotal ? Math.round((total / fullTotal) * 100) : 0}%</strong>
         </div>
-      </section>
+      </section> : null}
 
-      <div className="section-heading-row list-heading">
+      {scores.length > 0 ? <div className="section-heading-row list-heading">
         <h2>科目明细</h2>
         <span>{activeScores.length} 科</span>
-      </div>
+      </div> : null}
 
       {loading ? (
         <div className="center-state compact"><LoaderCircle className="spin" />加载中…</div>
-      ) : (
+      ) : scores.length > 0 ? (
         <div className="score-list">
           {activeScores.map((item) => {
             const percent = Math.round((item.score / item.full_score) * 100)
@@ -200,7 +211,7 @@ export function ScoresView({ scores, loading, onScoreAdded }: ScoresViewProps) {
             )
           })}
         </div>
-      )}
+      ) : null}
     </section>
   )
 }

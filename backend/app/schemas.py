@@ -44,6 +44,7 @@ class WrongQuestionOut(BaseModel):
     review_status: str
     review_count: int
     next_review_date: date | None
+    is_demo: bool
     created_at: datetime
 
 
@@ -59,6 +60,7 @@ class ScoreOut(ScoreCreate):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    is_demo: bool
 
 
 class AiCoachRequest(BaseModel):

@@ -40,7 +40,7 @@ from .schemas import (
     WrongQuestionOut,
     WrongQuestionUpdate,
 )
-from .seed import SUBJECT_FULL_SCORES, seed_demo_data
+from .seed import SUBJECT_FULL_SCORES, seed_default_templates, seed_demo_data
 
 
 EBBINGHAUS_INTERVALS = [1, 3, 7, 15, 30]
@@ -138,6 +138,7 @@ def collect_weekly_stats(db: Session, today: date | None = None) -> WeeklyStats:
 
     weekly_wrong_questions = list(db.scalars(
         select(WrongQuestion).where(
+            WrongQuestion.is_demo.is_(False),
             WrongQuestion.created_at >= week_start_dt,
             WrongQuestion.created_at < next_week_dt,
         )
@@ -147,7 +148,11 @@ def collect_weekly_stats(db: Session, today: date | None = None) -> WeeklyStats:
     causes = [item.cause for item in weekly_wrong_questions if item.cause]
     frequent_cause = Counter(causes).most_common(1)[0][0] if causes else "暂无"
 
-    score_rows = list(db.scalars(select(ExamScore).order_by(desc(ExamScore.exam_date), desc(ExamScore.id))))
+    score_rows = list(db.scalars(
+        select(ExamScore)
+        .where(ExamScore.is_demo.is_(False))
+        .order_by(desc(ExamScore.exam_date), desc(ExamScore.id))
+    ))
     weak_subjects: list[str] = []
     if score_rows:
         latest_exam = (score_rows[0].exam_date, score_rows[0].exam_name)
@@ -207,7 +212,9 @@ async def lifespan(_: FastAPI):
     Path(settings.upload_dir).mkdir(parents=True, exist_ok=True)
     with SessionLocal() as db:
         ensure_auth_users(db, settings)
-        seed_demo_data(db)
+        seed_default_templates(db)
+        if settings.seed_demo_data:
+            seed_demo_data(db)
         generate_tasks_from_templates(db, date.today())
     yield
 

@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://study:study@db:5432/study"
     upload_dir: str = "/data/uploads"
     max_upload_mb: int = 10
+    seed_demo_data: bool = False
 
     auth_username: str = Field(min_length=3, max_length=40)
     auth_password: str = Field(min_length=12, max_length=128)

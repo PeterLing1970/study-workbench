@@ -61,6 +61,7 @@ export function WrongQuestionDetail({ item, onUpdateStatus, onDelete, onClose }:
           <span className="wq-detail-icon"><FileImage aria-hidden="true" /></span>
           <div>
             <span className="wq-detail-subject">{item.subject}</span>
+            {item.is_demo ? <span className="demo-data-badge">演示数据</span> : null}
             <time className="wq-detail-date">{new Date(item.created_at).toLocaleDateString('zh-CN')}</time>
           </div>
         </div>

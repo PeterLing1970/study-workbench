@@ -37,6 +37,7 @@ AUTH_PARENT_PASSWORD=至少12位的家长密码
 AUTH_SECRET=至少32位的随机会话密钥
 AUTH_COOKIE_SECURE=true
 TRUSTED_ORIGINS=https://study.rostai.top
+SEED_DEMO_DATA=false
 MINIMAX_API_KEY=你的MiniMax Subscription Key或API Key
 DEEPSEEK_API_KEY=你的DeepSeek API Key（可暂时留空）
 ```
@@ -112,6 +113,7 @@ Hermes 数据保存在 `data/hermes`，端口 `8642` 只在内部 Docker 网络�
 - 任何AI分析都不会自动修改考试成绩。
 - 打开周报只读取真实统计，不调用模型、不写数据库；只有点击“生成本周 AI 诊断”才会请求模型并保存结果。
 - 真实记录为 0 时会保留 0 并提示数据不足，禁止使用演示数字冒充学习数据。
+- `SEED_DEMO_DATA` 默认关闭；升级时会删除旧版本内置的“七月期末摸底”和“八月阶段测验”示例成绩。两道示例错题会标记为“演示数据”，不参与真实周报统计。
 
 本项目按中国区账号配置 MiniMax：`https://api.minimaxi.com/v1/chat/completions`，模型名 `MiniMax-M3`；国际区账号应改用 `https://api.minimax.io/v1`。DeepSeek接口为 `https://api.deepseek.com/chat/completions`。
 
