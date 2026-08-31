@@ -10,11 +10,11 @@ interface ScoresViewProps {
   onScoreAdded: () => Promise<void>
 }
 
-const SUBJECT_FULL_SCORES: Record<string, number> = {
+const SUBJECT_DEFAULT_FULL_SCORES: Record<string, number> = {
   '语文': 120, '数学': 120, '英语': 120,
   '道法': 100, '物理': 100, '化学': 100, '历史': 100, '体育': 40,
 }
-const subjectList = Object.keys(SUBJECT_FULL_SCORES)
+const subjectList = Object.keys(SUBJECT_DEFAULT_FULL_SCORES)
 
 export function ScoresView({ scores, loading, onScoreAdded }: ScoresViewProps) {
   const [showForm, setShowForm] = useState(false)
@@ -22,6 +22,7 @@ export function ScoresView({ scores, loading, onScoreAdded }: ScoresViewProps) {
   const [examName, setExamName] = useState('')
   const [examDate, setExamDate] = useState(new Date().toISOString().slice(0, 10))
   const [subject, setSubject] = useState('语文')
+  const [fullScore, setFullScore] = useState(120)
   const [score, setScore] = useState('')
   const [classRank, setClassRank] = useState('')
   const [gradeRank, setGradeRank] = useState('')
@@ -59,7 +60,6 @@ export function ScoresView({ scores, loading, onScoreAdded }: ScoresViewProps) {
     if (!name) { setFormError('请输入考试名称'); return }
     const scoreNum = parseInt(score, 10)
     if (isNaN(scoreNum) || scoreNum < 0) { setFormError('请输入有效分数'); return }
-    const fullScore = SUBJECT_FULL_SCORES[subject]
     if (scoreNum > fullScore) { setFormError(`${subject}满分为 ${fullScore}`); return }
     const classRankNum = classRank ? parseInt(classRank, 10) : null
     const gradeRankNum = gradeRank ? parseInt(gradeRank, 10) : null
@@ -83,7 +83,11 @@ export function ScoresView({ scores, loading, onScoreAdded }: ScoresViewProps) {
       setScore('')
       // Move to next subject
       const idx = subjectList.indexOf(subject)
-      if (idx < subjectList.length - 1) setSubject(subjectList[idx + 1])
+      if (idx < subjectList.length - 1) {
+        const nextSubject = subjectList[idx + 1]
+        setSubject(nextSubject)
+        setFullScore(SUBJECT_DEFAULT_FULL_SCORES[nextSubject])
+      }
       await onScoreAdded()
     } catch (err) {
       setFormError(err instanceof Error ? err.message : '录入失败')
@@ -120,13 +124,28 @@ export function ScoresView({ scores, loading, onScoreAdded }: ScoresViewProps) {
           <div className="score-form-row">
             <div className="score-form-field">
               <label htmlFor="score-subject">科目</label>
-              <select id="score-subject" value={subject} onChange={(e) => setSubject(e.target.value)}>
+              <select id="score-subject" value={subject} onChange={(e) => {
+                const nextSubject = e.target.value
+                setSubject(nextSubject)
+                setFullScore(SUBJECT_DEFAULT_FULL_SCORES[nextSubject])
+              }}>
                 {subjectList.map((s) => <option key={s}>{s}</option>)}
               </select>
             </div>
             <div className="score-form-field">
-              <label htmlFor="score-value">分数 <small>/ {SUBJECT_FULL_SCORES[subject]}</small></label>
-              <input id="score-value" type="number" min={0} max={SUBJECT_FULL_SCORES[subject]} value={score} onChange={(e) => setScore(e.target.value)} placeholder="0" required />
+              <label htmlFor="score-full-score">满分</label>
+              <select id="score-full-score" value={fullScore} onChange={(e) => setFullScore(Number(e.target.value))}>
+                {subject === '体育' ? <option value={40}>40 分</option> : (
+                  <>
+                    <option value={100}>100 分</option>
+                    <option value={120}>120 分</option>
+                  </>
+                )}
+              </select>
+            </div>
+            <div className="score-form-field">
+              <label htmlFor="score-value">分数 <small>/ {fullScore}</small></label>
+              <input id="score-value" type="number" min={0} max={fullScore} value={score} onChange={(e) => setScore(e.target.value)} placeholder="0" required />
             </div>
           </div>
           <div className="score-form-row score-rank-row">

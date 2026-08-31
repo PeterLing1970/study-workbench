@@ -227,7 +227,7 @@ async def lifespan(_: FastAPI):
 
 trusted_origins = {origin.strip().rstrip("/") for origin in settings.trusted_origins.split(",") if origin.strip()}
 
-app = FastAPI(title=settings.app_name, version="0.4.2", lifespan=lifespan)
+app = FastAPI(title=settings.app_name, version="0.4.3", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=sorted(trusted_origins),
@@ -663,11 +663,12 @@ def add_score(
     db: Session = Depends(get_db),
     _current_user: User = Depends(require_student),
 ) -> ExamScore:
-    expected_full_score = SUBJECT_FULL_SCORES.get(payload.subject)
-    if expected_full_score is None:
+    if payload.subject not in SUBJECT_FULL_SCORES:
         raise HTTPException(status_code=400, detail="未知科目")
-    if payload.full_score != expected_full_score:
-        raise HTTPException(status_code=400, detail=f"{payload.subject}满分应为 {expected_full_score}")
+    allowed_full_scores = {40} if payload.subject == "体育" else {100, 120}
+    if payload.full_score not in allowed_full_scores:
+        choices = " 或 ".join(str(value) for value in sorted(allowed_full_scores))
+        raise HTTPException(status_code=400, detail=f"{payload.subject}满分应为 {choices}")
     if payload.score > payload.full_score:
         raise HTTPException(status_code=400, detail="成绩不能超过满分")
     score = ExamScore(**payload.model_dump())

@@ -67,14 +67,28 @@ def provider_candidates(
         api_key=settings.minimax_api_key,
         model=settings.minimax_model,
     )
-    deepseek = ProviderConfig(
+    deepseek_flash = ProviderConfig(
         name="deepseek",
         base_url=settings.deepseek_base_url,
         api_key=settings.deepseek_api_key,
-        model=settings.deepseek_reasoning_model if reasoning else settings.deepseek_model,
+        model=settings.deepseek_model,
     )
-    if preferred_provider in {"minimax", "deepseek"}:
-        ordered = [minimax] if preferred_provider == "minimax" else [deepseek]
+    deepseek_pro = ProviderConfig(
+        name="deepseek",
+        base_url=settings.deepseek_base_url,
+        api_key=settings.deepseek_api_key,
+        model=settings.deepseek_reasoning_model,
+    )
+    deepseek = deepseek_pro if reasoning else deepseek_flash
+    if preferred_provider in {"minimax", "deepseek", "deepseek_flash", "deepseek_pro"}:
+        if preferred_provider == "minimax":
+            ordered = [minimax]
+        elif preferred_provider == "deepseek_pro":
+            ordered = [deepseek_pro]
+        elif preferred_provider == "deepseek_flash":
+            ordered = [deepseek_flash]
+        else:
+            ordered = [deepseek]
     else:
         ordered = [minimax, deepseek] if settings.ai_primary_provider == "minimax" else [deepseek, minimax]
     return [provider for provider in ordered if provider.api_key]
@@ -120,10 +134,10 @@ async def request_chat(
                 payload["reasoning_split"] = True
                 payload["max_completion_tokens"] = payload.pop("max_tokens")
             elif provider.name == "deepseek":
-                # DeepSeek 的 thinking/reasoning 靠模型名切换：deepseek-* 是普通 chat，deepseek-reasoner 才推理。
-                # 不能把 MiniMax 的 thinking/reasoning_split 透传给 DeepSeek，API 直接 400。
-                # reasoner 模型 max_tokens 与 content 共享 64K 限额，扩到 8000 保证复杂题答完。
-                if reasoning:
+                is_pro = provider.model == settings.deepseek_reasoning_model
+                payload["thinking"] = {"type": "enabled" if is_pro else "disabled"}
+                if is_pro:
+                    payload["reasoning_effort"] = "high"
                     payload["max_tokens"] = max(max_tokens, 8000)
                 else:
                     payload["max_tokens"] = max(max_tokens, 4000)

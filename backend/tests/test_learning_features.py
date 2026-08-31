@@ -15,9 +15,9 @@ from sqlalchemy.orm import Session
 from app.database import Base
 from app.auth import ensure_feature_schema
 from app.ai import provider_candidates
-from app.main import compute_next_review, generate_tasks_from_templates, has_valid_image_signature, update_wrong_question
+from app.main import add_score, compute_next_review, generate_tasks_from_templates, has_valid_image_signature, update_wrong_question
 from app.models import StudyTask, TaskTemplate, WrongQuestion
-from app.schemas import WrongQuestionUpdate
+from app.schemas import ScoreCreate, WrongQuestionUpdate
 
 
 class TaskTemplateTests(unittest.TestCase):
@@ -140,6 +140,52 @@ class AiProviderSelectionTests(unittest.TestCase):
         candidates = provider_candidates(settings, preferred_provider="deepseek")
 
         self.assertEqual([candidate.name for candidate in candidates], ["deepseek"])
+
+    def test_deepseek_v4_models_can_be_selected_explicitly(self) -> None:
+        settings = SimpleNamespace(
+            minimax_base_url="https://example.invalid/minimax",
+            minimax_api_key="minimax-key",
+            minimax_model="MiniMax-M3",
+            deepseek_base_url="https://example.invalid/deepseek",
+            deepseek_api_key="deepseek-key",
+            deepseek_model="deepseek-v4-flash",
+            deepseek_reasoning_model="deepseek-v4-pro",
+            ai_primary_provider="minimax",
+        )
+
+        flash = provider_candidates(settings, preferred_provider="deepseek_flash")
+        pro = provider_candidates(settings, preferred_provider="deepseek_pro")
+
+        self.assertEqual([candidate.model for candidate in flash], ["deepseek-v4-flash"])
+        self.assertEqual([candidate.model for candidate in pro], ["deepseek-v4-pro"])
+
+
+class ScoreFullScoreTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.engine = create_engine("sqlite+pysqlite:///:memory:")
+        Base.metadata.create_all(self.engine)
+        self.db = Session(self.engine)
+
+    def tearDown(self) -> None:
+        self.db.close()
+        self.engine.dispose()
+
+    def test_academic_subject_accepts_100_or_120_full_score(self) -> None:
+        for full_score in (100, 120):
+            saved = add_score(
+                ScoreCreate(exam_name=f"{full_score}分制测试", exam_date=date(2026, 8, 31), subject="数学", score=88, full_score=full_score),
+                db=self.db,
+                _current_user=None,
+            )
+            self.assertEqual(saved.full_score, full_score)
+
+    def test_physical_education_keeps_40_full_score(self) -> None:
+        saved = add_score(
+            ScoreCreate(exam_name="体育测试", exam_date=date(2026, 8, 31), subject="体育", score=36, full_score=40),
+            db=self.db,
+            _current_user=None,
+        )
+        self.assertEqual(saved.full_score, 40)
 
 
 class SpacedRepetitionTests(unittest.TestCase):

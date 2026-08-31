@@ -116,7 +116,7 @@ export const api = {
   focusStats: () => request<FocusStats>('/api/focus-records/stats'),
 
   // AI Coach & Chat History
-  coach: (subject: string, question: string, studentThought: string, provider: 'auto' | 'minimax' | 'deepseek') =>
+  coach: (subject: string, question: string, studentThought: string, provider: 'auto' | 'minimax' | 'deepseek_flash' | 'deepseek_pro') =>
     request<{ provider: string; model: string; demo: boolean; answer: string }>('/api/ai/coach', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
