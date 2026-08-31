@@ -7,7 +7,7 @@ from uuid import uuid4
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
@@ -25,6 +25,7 @@ from .schemas import (
     FocusRecordOut,
     FocusStatsOut,
     LoginRequest,
+    ProfileUpdate,
     ScoreCreate,
     ScoreOut,
     ScoreTrendPoint,
@@ -40,7 +41,7 @@ from .schemas import (
     WrongQuestionOut,
     WrongQuestionUpdate,
 )
-from .seed import SUBJECT_FULL_SCORES, seed_default_templates, seed_demo_data
+from .seed import SUBJECT_FULL_SCORES, seed_demo_data
 
 
 EBBINGHAUS_INTERVALS = [1, 3, 7, 15, 30]
@@ -119,7 +120,11 @@ def collect_weekly_stats(db: Session, today: date | None = None) -> WeeklyStats:
     next_week_dt = week_start_dt + timedelta(days=7)
 
     tasks = list(db.scalars(
-        select(StudyTask).where(StudyTask.task_date >= week_start, StudyTask.task_date <= week_end)
+        select(StudyTask).where(
+            StudyTask.task_date >= week_start,
+            StudyTask.task_date <= week_end,
+            StudyTask.dismissed.is_(False),
+        )
     ))
     total_planned_tasks = len(tasks)
     total_completed_tasks = sum(1 for task in tasks if task.completed)
@@ -212,16 +217,17 @@ async def lifespan(_: FastAPI):
     Path(settings.upload_dir).mkdir(parents=True, exist_ok=True)
     with SessionLocal() as db:
         ensure_auth_users(db, settings)
-        seed_default_templates(db)
         if settings.seed_demo_data:
             seed_demo_data(db)
-        generate_tasks_from_templates(db, date.today())
+        # 注意：不再在启动时统一生成今日任务——
+        # 默认模板 active=False，用户先看到一张干净的“今天还没有学习任务”面板，
+        # 去“模板”页手动开启需要的科目后，下次访问 dashboard 才会按模板生成。
     yield
 
 
 trusted_origins = {origin.strip().rstrip("/") for origin in settings.trusted_origins.split(",") if origin.strip()}
 
-app = FastAPI(title=settings.app_name, version="0.4.1", lifespan=lifespan)
+app = FastAPI(title=settings.app_name, version="0.4.2", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=sorted(trusted_origins),
@@ -271,6 +277,21 @@ def auth_me(current_user: User = Depends(require_user)) -> UserOut:
     return UserOut.model_validate(current_user)
 
 
+@app.patch("/api/auth/me", response_model=UserOut)
+def update_me(
+    payload: ProfileUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+) -> UserOut:
+    if payload.display_name is not None:
+        current_user.display_name = payload.display_name.strip()
+    if payload.grade is not None:
+        current_user.grade = payload.grade.strip()
+    db.commit()
+    db.refresh(current_user)
+    return UserOut.model_validate(current_user)
+
+
 # ── Dashboard ──
 
 @app.get("/api/dashboard", response_model=DashboardOut)
@@ -282,12 +303,11 @@ def dashboard(
     generate_tasks_from_templates(db, today)
     tasks = list(
         db.scalars(
-            select(StudyTask).where(StudyTask.task_date == today).order_by(StudyTask.sort_order, StudyTask.id)
+            select(StudyTask)
+            .where(StudyTask.task_date == today, StudyTask.dismissed.is_(False))
+            .order_by(StudyTask.sort_order, StudyTask.id)
         )
     )
-    if not tasks:
-        seed_demo_data(db)
-        tasks = list(db.scalars(select(StudyTask).order_by(desc(StudyTask.task_date), StudyTask.sort_order).limit(3)))
 
     planned_minutes = sum(task.minutes for task in tasks)
     completed_minutes = sum(task.minutes for task in tasks if task.completed)
@@ -397,7 +417,7 @@ def delete_task(
     task = db.get(StudyTask, task_id)
     if task is None:
         raise HTTPException(status_code=404, detail="任务不存在")
-    db.delete(task)
+    task.dismissed = True
     db.commit()
     return Response(status_code=204)
 
@@ -465,13 +485,54 @@ def delete_template(
 
 
 # ── Wrong Questions ──
+def serialize_wrong_question(wq: WrongQuestion) -> WrongQuestionOut:
+    has_image = bool(wq.image_path and Path(wq.image_path).is_file())
+    image_url = f"/api/wrong-questions/{wq.id}/image" if has_image else None
+    return WrongQuestionOut(
+        id=wq.id,
+        subject=wq.subject,
+        title=wq.title,
+        cause=wq.cause,
+        knowledge_point=wq.knowledge_point,
+        ai_summary=wq.ai_summary,
+        review_status=wq.review_status,
+        review_count=wq.review_count,
+        next_review_date=wq.next_review_date,
+        is_demo=wq.is_demo,
+        has_image=has_image,
+        image_url=image_url,
+        created_at=wq.created_at,
+    )
+
 
 @app.get("/api/wrong-questions", response_model=list[WrongQuestionOut])
 def wrong_questions(
     db: Session = Depends(get_db),
     _current_user: User = Depends(require_user),
-) -> list[WrongQuestion]:
-    return list(db.scalars(select(WrongQuestion).order_by(desc(WrongQuestion.created_at)).limit(100)))
+) -> list[WrongQuestionOut]:
+    items = list(db.scalars(select(WrongQuestion).order_by(desc(WrongQuestion.created_at)).limit(100)))
+    return [serialize_wrong_question(item) for item in items]
+
+
+@app.get("/api/wrong-questions/{wq_id}/image")
+def get_wrong_question_image(
+    wq_id: int,
+    db: Session = Depends(get_db),
+    _current_user: User = Depends(require_user),
+) -> FileResponse:
+    wq = db.get(WrongQuestion, wq_id)
+    if wq is None or not wq.image_path:
+        raise HTTPException(status_code=404, detail="图片不存在")
+    path = Path(wq.image_path)
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="图片文件已移除")
+    suffix = path.suffix.lower()
+    media_type = "image/jpeg"
+    if suffix == ".png":
+        media_type = "image/png"
+    elif suffix == ".webp":
+        media_type = "image/webp"
+    return FileResponse(path, media_type=media_type)
 
 
 @app.patch("/api/wrong-questions/{wq_id}", response_model=WrongQuestionOut)
@@ -480,7 +541,7 @@ def update_wrong_question(
     payload: WrongQuestionUpdate,
     db: Session = Depends(get_db),
     _current_user: User = Depends(require_student),
-) -> WrongQuestion:
+) -> WrongQuestionOut:
     wq = db.get(WrongQuestion, wq_id)
     if wq is None:
         raise HTTPException(status_code=404, detail="错题不存在")
@@ -501,7 +562,7 @@ def update_wrong_question(
         setattr(wq, field, value)
     db.commit()
     db.refresh(wq)
-    return wq
+    return serialize_wrong_question(wq)
 
 
 @app.delete("/api/wrong-questions/{wq_id}", status_code=204, response_class=Response)
@@ -522,15 +583,16 @@ def delete_wrong_question(
 def due_wrong_questions(
     db: Session = Depends(get_db),
     _current_user: User = Depends(require_user),
-) -> list[WrongQuestion]:
+) -> list[WrongQuestionOut]:
     """Return wrong questions due for review today or overdue."""
     today = date.today()
-    return list(db.scalars(
+    items = list(db.scalars(
         select(WrongQuestion)
         .where(WrongQuestion.review_status != "已掌握", WrongQuestion.next_review_date <= today)
         .order_by(WrongQuestion.next_review_date)
         .limit(50)
     ))
+    return [serialize_wrong_question(item) for item in items]
 
 
 @app.post("/api/wrong-questions/analyze")
@@ -578,7 +640,7 @@ async def create_wrong_question(
     db.commit()
     db.refresh(item)
     return {
-        "item": WrongQuestionOut.model_validate(item),
+        "item": serialize_wrong_question(item),
         "provider": provider,
         "model": model,
         "demo": demo,
@@ -716,6 +778,7 @@ async def ai_coach(
             system_prompt,
             user_prompt,
             reasoning=payload.subject in {"数学", "物理", "化学"},
+            preferred_provider=None if payload.provider == "auto" else payload.provider,
         )
     except AiUnavailable:
         demo = True

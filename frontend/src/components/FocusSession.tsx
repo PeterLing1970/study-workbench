@@ -1,4 +1,4 @@
-import { Check, Flame, LoaderCircle, Music, Pause, Play, RotateCcw, Volume2, VolumeX, X } from 'lucide-react'
+import { Check, Coffee, Flame, LoaderCircle, Pause, Play, RotateCcw, Volume2, VolumeX, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { api } from '../api'
 import { useDialogA11y } from '../hooks/useDialogA11y'
@@ -8,6 +8,7 @@ interface FocusSessionProps {
   task: Task
   onClose: () => void
   onComplete: () => void
+  restOnly?: boolean
 }
 
 type TimerMode = 'task' | 'pomodoro' | 'break'
@@ -83,10 +84,10 @@ class AmbientSound {
   }
 }
 
-export function FocusSession({ task, onClose, onComplete }: FocusSessionProps) {
-  const [timerMode, setTimerMode] = useState<TimerMode>('pomodoro')
+export function FocusSession({ task, onClose, onComplete, restOnly = false }: FocusSessionProps) {
+  const [timerMode, setTimerMode] = useState<TimerMode>(restOnly ? 'break' : 'pomodoro')
   const [running, setRunning] = useState(true)
-  const [secondsLeft, setSecondsLeft] = useState(25 * 60)
+  const [secondsLeft, setSecondsLeft] = useState((restOnly ? 5 : 25) * 60)
   const [actualSeconds, setActualSeconds] = useState(0)
   const [pomodorosCompleted, setPomodorosCompleted] = useState(0)
   const [soundActive, setSoundActive] = useState(false)
@@ -128,14 +129,17 @@ export function FocusSession({ task, onClose, onComplete }: FocusSessionProps) {
         setTimerMode('break')
         setSecondsLeft(5 * 60)
       } else if (timerMode === 'break') {
-        // Back to pomodoro
-        setTimerMode('pomodoro')
-        setSecondsLeft(25 * 60)
+        if (restOnly) {
+          setShowFeedback(true)
+        } else {
+          setTimerMode('pomodoro')
+          setSecondsLeft(25 * 60)
+        }
       } else if (timerMode === 'task') {
         setShowFeedback(true)
       }
     }
-  }, [secondsLeft, timerMode])
+  }, [restOnly, secondsLeft, timerMode])
 
   const toggleSound = () => {
     if (soundActive) {
@@ -155,6 +159,11 @@ export function FocusSession({ task, onClose, onComplete }: FocusSessionProps) {
   }
 
   const handleFinish = async (_mastery: 'mastered' | 'need_practice') => {
+    if (restOnly) {
+      soundRef.current?.stop()
+      onComplete()
+      return
+    }
     setSavingRecord(true)
     try {
       await api.saveFocusRecord({
@@ -181,13 +190,13 @@ export function FocusSession({ task, onClose, onComplete }: FocusSessionProps) {
   return (
     <div ref={dialogRef} className="focus-overlay" role="dialog" aria-modal="true" aria-labelledby="focus-title" tabIndex={-1}>
       <section className="focus-sheet pomodoro-sheet">
-        <button className="icon-button focus-close" type="button" onClick={closeSession} aria-label="关闭专注学习">
+        <button className="icon-button focus-close" type="button" onClick={closeSession} aria-label={restOnly ? '关闭休息计时' : '关闭专注学习'}>
           <X aria-hidden="true" />
         </button>
 
         {!showFeedback ? (
           <>
-            <div className="focus-mode-selector">
+            {!restOnly ? <div className="focus-mode-selector">
               <button
                 type="button"
                 className={`mode-chip ${timerMode === 'pomodoro' ? 'active' : ''}`}
@@ -209,7 +218,7 @@ export function FocusSession({ task, onClose, onComplete }: FocusSessionProps) {
               >
                 休息 (5分)
               </button>
-            </div>
+            </div> : <span className="focus-rest-label"><Coffee size={15} /> 5分钟休息</span>}
 
             <span className="focus-subject">{task.subject}</span>
             <h2 id="focus-title">{task.title}</h2>
@@ -218,7 +227,7 @@ export function FocusSession({ task, onClose, onComplete }: FocusSessionProps) {
               {minutes}:{seconds}
             </div>
 
-            <div className="pomodoro-tracker">
+            {!restOnly ? <div className="pomodoro-tracker">
               {Array.from({ length: Math.max(4, pomodorosCompleted + 1) }).map((_, i) => (
                 <span
                   key={i}
@@ -227,7 +236,7 @@ export function FocusSession({ task, onClose, onComplete }: FocusSessionProps) {
                 />
               ))}
               <span className="pomodoro-count-label">已专注 {totalActualMinutes} 分钟 · {pomodorosCompleted} 个番茄</span>
-            </div>
+            </div> : null}
 
             <div className="focus-controls">
               <button className="focus-toggle" type="button" onClick={() => setRunning((value) => !value)}>
@@ -261,10 +270,17 @@ export function FocusSession({ task, onClose, onComplete }: FocusSessionProps) {
             </div>
 
             <button className="focus-complete" type="button" onClick={() => setShowFeedback(true)}>
-              <Check aria-hidden="true" /> 完成本次学习
+              <Check aria-hidden="true" /> {restOnly ? '结束休息' : '完成本次学习'}
             </button>
           </>
         ) : (
+          restOnly ? (
+          <div className="focus-feedback-card">
+            <h3>休息结束，准备好再继续</h3>
+            <p>活动一下肩颈、眺望远处，让眼睛和大脑都缓一缓。</p>
+            <button className="focus-complete" type="button" onClick={() => handleFinish('mastered')}>返回 AI学习助手</button>
+          </div>
+          ) : (
           <div className="focus-feedback-card">
             <h3>🎉 太棒了！本次专注结束</h3>
             <p>本次学习累计专注 <strong>{totalActualMinutes} 分钟</strong>（{pomodorosCompleted} 个番茄钟）。</p>
@@ -293,6 +309,7 @@ export function FocusSession({ task, onClose, onComplete }: FocusSessionProps) {
               </button>
             </div>
           </div>
+          )
         )}
       </section>
     </div>

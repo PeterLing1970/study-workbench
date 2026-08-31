@@ -1,4 +1,4 @@
-import { Award, Bot, ChevronRight, Database, Flame, HardDrive, LogOut, ShieldCheck, Timer } from 'lucide-react'
+import { Award, Bot, ChevronRight, Database, Edit3, Flame, HardDrive, LogOut, Save, ShieldCheck, Timer } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { api } from '../api'
 import type { AuthUser, FocusStats } from '../types'
@@ -7,12 +7,34 @@ import { WeeklyReportModal } from '../components/WeeklyReportModal'
 interface ProfileViewProps {
   user: AuthUser
   onLogout: () => Promise<void>
+  onUserUpdate: (user: AuthUser) => void
 }
 
-export function ProfileView({ user, onLogout }: ProfileViewProps) {
+const GRADES = ['初一', '初二', '初三', '高一', '高二', '高三', '大学']
+
+export function ProfileView({ user, onLogout, onUserUpdate }: ProfileViewProps) {
   const isParent = user.role === 'parent'
   const [stats, setStats] = useState<FocusStats | null>(null)
   const [showWeeklyReport, setShowWeeklyReport] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [nameInput, setNameInput] = useState(user.display_name)
+  const [gradeInput, setGradeInput] = useState(user.grade || '初三')
+  const [saving, setSaving] = useState(false)
+
+  const displayLabel = user.display_name || (isParent ? '家长账号' : `${user.grade || '初三'}学生`)
+
+  const saveProfile = async () => {
+    setSaving(true)
+    try {
+      const updated = await api.updateProfile({ display_name: nameInput.trim(), grade: gradeInput })
+      onUserUpdate(updated)
+      setEditing(false)
+    } catch {
+      // ignore
+    } finally {
+      setSaving(false)
+    }
+  }
 
   useEffect(() => {
     void api.focusStats().then(setStats).catch(() => {})
@@ -27,8 +49,46 @@ export function ProfileView({ user, onLogout }: ProfileViewProps) {
 
       <section className="profile-card">
         <span className={isParent ? 'avatar avatar-parent' : 'avatar'}>{isParent ? '家' : '学'}</span>
-        <div><strong>{isParent ? '家长账号' : '初三学生'}</strong><small>登录账号：{user.username}</small></div>
+        <div><strong>{displayLabel}</strong><small>登录账号：{user.username}</small></div>
+        {!isParent ? (
+          <button
+            className="profile-edit-btn"
+            type="button"
+            onClick={() => {
+              setNameInput(user.display_name)
+              setGradeInput(user.grade || '初三')
+              setEditing((value) => !value)
+            }}
+            aria-label="编辑名字与年级"
+          >
+            <Edit3 size={15} />
+          </button>
+        ) : null}
       </section>
+
+      {editing ? (
+        <section className="profile-edit-panel">
+          <label>
+            <span>名字</span>
+            <input
+              value={nameInput}
+              onChange={(e) => setNameInput(e.target.value)}
+              placeholder="输入名字"
+              maxLength={40}
+            />
+          </label>
+          <label>
+            <span>年级</span>
+            <select value={gradeInput} onChange={(e) => setGradeInput(e.target.value)}>
+              {GRADES.map((g) => <option key={g} value={g}>{g}</option>)}
+            </select>
+          </label>
+          <button className="profile-save-btn" type="button" onClick={saveProfile} disabled={saving}>
+            <Save size={15} />
+            {saving ? '保存中…' : '保存'}
+          </button>
+        </section>
+      ) : null}
 
       {/* Weekly Report Entry Button */}
       <button
@@ -89,7 +149,7 @@ export function ProfileView({ user, onLogout }: ProfileViewProps) {
         <LogOut size={18} aria-hidden="true" />退出登录
       </button>
 
-      <p className="version-note">学习工作台 v0.4.1 · 家庭内测版</p>
+      <p className="version-note">AI学习助手 v0.4.2 · 家庭内测版</p>
 
       {showWeeklyReport ? (
         <WeeklyReportModal onClose={() => setShowWeeklyReport(false)} />

@@ -23,6 +23,8 @@ export function ScoresView({ scores, loading, onScoreAdded }: ScoresViewProps) {
   const [examDate, setExamDate] = useState(new Date().toISOString().slice(0, 10))
   const [subject, setSubject] = useState('语文')
   const [score, setScore] = useState('')
+  const [classRank, setClassRank] = useState('')
+  const [gradeRank, setGradeRank] = useState('')
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
   const [formSuccess, setFormSuccess] = useState('')
@@ -42,6 +44,8 @@ export function ScoresView({ scores, loading, onScoreAdded }: ScoresViewProps) {
   const total = activeScores.reduce((sum, item) => sum + item.score, 0)
   const fullTotal = activeScores.reduce((sum, item) => sum + item.full_score, 0)
   const activeIsDemo = activeScores.some((item) => item.is_demo)
+  const activeClassRank = activeScores.find((item) => item.class_rank !== null)?.class_rank ?? null
+  const activeGradeRank = activeScores.find((item) => item.grade_rank !== null)?.grade_rank ?? null
 
   // Diagnostics: find weak subjects (< 80% rate)
   const weakSubjects = activeScores.filter((item) => {
@@ -57,12 +61,24 @@ export function ScoresView({ scores, loading, onScoreAdded }: ScoresViewProps) {
     if (isNaN(scoreNum) || scoreNum < 0) { setFormError('请输入有效分数'); return }
     const fullScore = SUBJECT_FULL_SCORES[subject]
     if (scoreNum > fullScore) { setFormError(`${subject}满分为 ${fullScore}`); return }
+    const classRankNum = classRank ? parseInt(classRank, 10) : null
+    const gradeRankNum = gradeRank ? parseInt(gradeRank, 10) : null
+    if (classRankNum !== null && (!Number.isInteger(classRankNum) || classRankNum < 1)) { setFormError('班级排名必须为正整数'); return }
+    if (gradeRankNum !== null && (!Number.isInteger(gradeRankNum) || gradeRankNum < 1)) { setFormError('年级排名必须为正整数'); return }
 
     setSaving(true)
     setFormError('')
     setFormSuccess('')
     try {
-      await api.addScore({ exam_name: name, exam_date: examDate, subject, score: scoreNum, full_score: fullScore })
+      await api.addScore({
+        exam_name: name,
+        exam_date: examDate,
+        subject,
+        score: scoreNum,
+        full_score: fullScore,
+        class_rank: classRankNum,
+        grade_rank: gradeRankNum,
+      })
       setFormSuccess(`${subject} ${scoreNum}分 已录入`)
       setScore('')
       // Move to next subject
@@ -111,6 +127,16 @@ export function ScoresView({ scores, loading, onScoreAdded }: ScoresViewProps) {
             <div className="score-form-field">
               <label htmlFor="score-value">分数 <small>/ {SUBJECT_FULL_SCORES[subject]}</small></label>
               <input id="score-value" type="number" min={0} max={SUBJECT_FULL_SCORES[subject]} value={score} onChange={(e) => setScore(e.target.value)} placeholder="0" required />
+            </div>
+          </div>
+          <div className="score-form-row score-rank-row">
+            <div className="score-form-field">
+              <label htmlFor="class-rank">班级排名 <small>可选</small></label>
+              <input id="class-rank" type="number" min={1} max={10000} step={1} value={classRank} onChange={(e) => setClassRank(e.target.value)} placeholder="例如：5" />
+            </div>
+            <div className="score-form-field">
+              <label htmlFor="grade-rank">年级排名 <small>可选</small></label>
+              <input id="grade-rank" type="number" min={1} max={10000} step={1} value={gradeRank} onChange={(e) => setGradeRank(e.target.value)} placeholder="例如：28" />
             </div>
             <button className="score-form-submit" type="submit" disabled={saving}>
               {saving ? <LoaderCircle className="spin" size={16} /> : <Plus size={16} />}
@@ -183,6 +209,8 @@ export function ScoresView({ scores, loading, onScoreAdded }: ScoresViewProps) {
           <span>得分率</span>
           <strong>{fullTotal ? Math.round((total / fullTotal) * 100) : 0}%</strong>
         </div>
+        {activeClassRank !== null ? <div className="score-rank-summary"><span>班级排名</span><strong>第 {activeClassRank} 名</strong></div> : null}
+        {activeGradeRank !== null ? <div className="score-rank-summary"><span>年级排名</span><strong>第 {activeGradeRank} 名</strong></div> : null}
       </section> : null}
 
       {scores.length > 0 ? <div className="section-heading-row list-heading">

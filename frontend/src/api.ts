@@ -22,6 +22,12 @@ const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
 
 export const api = {
   me: () => request<AuthUser>('/api/auth/me'),
+  updateProfile: (data: { display_name?: string; grade?: string }) =>
+    request<AuthUser>('/api/auth/me', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
   login: (username: string, password: string) => request<AuthUser>('/api/auth/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -84,7 +90,15 @@ export const api = {
 
   // Scores
   scores: () => request<Score[]>('/api/scores'),
-  addScore: (data: { exam_name: string; exam_date: string; subject: string; score: number; full_score: number }) =>
+  addScore: (data: {
+    exam_name: string
+    exam_date: string
+    subject: string
+    score: number
+    full_score: number
+    class_rank?: number | null
+    grade_rank?: number | null
+  }) =>
     request<Score>('/api/scores', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -102,11 +116,11 @@ export const api = {
   focusStats: () => request<FocusStats>('/api/focus-records/stats'),
 
   // AI Coach & Chat History
-  coach: (subject: string, question: string, studentThought: string) =>
+  coach: (subject: string, question: string, studentThought: string, provider: 'auto' | 'minimax' | 'deepseek') =>
     request<{ provider: string; model: string; demo: boolean; answer: string }>('/api/ai/coach', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ subject, question, student_thought: studentThought }),
+      body: JSON.stringify({ subject, question, student_thought: studentThought, provider }),
     }),
   chatHistory: (subject?: string) => {
     const query = subject && subject !== '全部' ? `?subject=${encodeURIComponent(subject)}` : ''

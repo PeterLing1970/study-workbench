@@ -1,6 +1,7 @@
 import os
 import unittest
 from datetime import date, timedelta
+from types import SimpleNamespace
 
 os.environ.setdefault("AUTH_USERNAME", "student")
 os.environ.setdefault("AUTH_PASSWORD", "student-password-123")
@@ -13,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.database import Base
 from app.auth import ensure_feature_schema
+from app.ai import provider_candidates
 from app.main import compute_next_review, generate_tasks_from_templates, has_valid_image_signature, update_wrong_question
 from app.models import StudyTask, TaskTemplate, WrongQuestion
 from app.schemas import WrongQuestionUpdate
@@ -44,6 +46,42 @@ class TaskTemplateTests(unittest.TestCase):
         self.assertEqual(len(tasks), 1)
         self.assertEqual(tasks[0].title, "每日练习")
 
+    def test_dismissed_template_task_is_not_generated_again(self) -> None:
+        monday = date(2026, 8, 31)
+        self.db.add(TaskTemplate(subject="数学", title="每日练习", minutes=20, weekdays="0", active=True))
+        self.db.commit()
+        generate_tasks_from_templates(self.db, monday)
+        task = self.db.scalar(select(StudyTask))
+        self.assertIsNotNone(task)
+        task.dismissed = True
+        self.db.commit()
+
+        generate_tasks_from_templates(self.db, monday)
+
+        self.assertEqual(self.db.scalar(select(func.count()).select_from(StudyTask)), 1)
+
+    def test_upgrade_removes_only_built_in_templates(self) -> None:
+        built_in = TaskTemplate(subject="语文", title="古诗默写", minutes=20, weekdays="0", active=True)
+        custom = TaskTemplate(subject="语文", title="作文素材整理", minutes=25, weekdays="0", active=True)
+        self.db.add_all([built_in, custom])
+        self.db.commit()
+        self.db.add(StudyTask(
+            task_date=date(2026, 8, 31),
+            subject="语文",
+            title="古诗默写",
+            minutes=20,
+            template_id=built_in.id,
+        ))
+        self.db.commit()
+
+        ensure_feature_schema(self.engine)
+        self.db.expire_all()
+
+        templates = list(self.db.scalars(select(TaskTemplate).order_by(TaskTemplate.id)))
+        task = self.db.scalar(select(StudyTask))
+        self.assertEqual([item.title for item in templates], ["作文素材整理"])
+        self.assertTrue(task.dismissed)
+
 
 class FeatureMigrationTests(unittest.TestCase):
     def test_existing_tables_receive_v041_columns(self) -> None:
@@ -61,11 +99,15 @@ class FeatureMigrationTests(unittest.TestCase):
         ensure_feature_schema(engine)
         inspector = inspect(engine)
 
-        self.assertIn("template_id", {column["name"] for column in inspector.get_columns("study_tasks")})
+        self.assertTrue({"template_id", "dismissed"}.issubset(
+            {column["name"] for column in inspector.get_columns("study_tasks")}
+        ))
         self.assertTrue({"review_count", "next_review_date"}.issubset(
             {column["name"] for column in inspector.get_columns("wrong_questions")}
         ))
-        self.assertIn("is_demo", {column["name"] for column in inspector.get_columns("exam_scores")})
+        self.assertTrue({"is_demo", "class_rank", "grade_rank"}.issubset(
+            {column["name"] for column in inspector.get_columns("exam_scores")}
+        ))
         with engine.connect() as connection:
             remaining_exams = list(connection.execute(text("SELECT exam_name FROM exam_scores ORDER BY exam_name")).scalars())
         self.assertEqual(remaining_exams, ["九月月考"])
@@ -80,6 +122,24 @@ class UploadValidationTests(unittest.TestCase):
         self.assertTrue(has_valid_image_signature(b"\x89PNG\r\n\x1a\nrest", "image/png"))
         self.assertFalse(has_valid_image_signature(b"not really an image", "image/png"))
         self.assertTrue(has_valid_image_signature(b"RIFFxxxxWEBPrest", "image/webp"))
+
+
+class AiProviderSelectionTests(unittest.TestCase):
+    def test_explicit_provider_disables_automatic_fallback(self) -> None:
+        settings = SimpleNamespace(
+            minimax_base_url="https://example.invalid/minimax",
+            minimax_api_key="minimax-key",
+            minimax_model="MiniMax-M3",
+            deepseek_base_url="https://example.invalid/deepseek",
+            deepseek_api_key="deepseek-key",
+            deepseek_model="deepseek-chat",
+            deepseek_reasoning_model="deepseek-reasoner",
+            ai_primary_provider="minimax",
+        )
+
+        candidates = provider_candidates(settings, preferred_provider="deepseek")
+
+        self.assertEqual([candidate.name for candidate in candidates], ["deepseek"])
 
 
 class SpacedRepetitionTests(unittest.TestCase):
@@ -113,6 +173,8 @@ class SpacedRepetitionTests(unittest.TestCase):
 
         self.assertEqual(updated.review_count, 1)
         self.assertEqual(updated.next_review_date, date.today() + timedelta(days=1))
+        self.assertFalse(updated.has_image)
+        self.assertIsNone(updated.image_url)
         count = self.db.scalar(select(func.count()).select_from(WrongQuestion))
         self.assertEqual(count, 1)
 

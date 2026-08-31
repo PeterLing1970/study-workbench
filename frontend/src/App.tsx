@@ -11,6 +11,15 @@ import { TodayView } from './views/TodayView'
 import { WrongQuestionsView } from './views/WrongQuestionsView'
 import { CoachView } from './views/CoachView'
 
+const REST_TASK: Task = {
+  id: 0,
+  subject: '休息',
+  title: '短暂休息，放松眼睛和身体',
+  minutes: 5,
+  completed: false,
+  template_id: null,
+}
+
 export default function App() {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [authLoading, setAuthLoading] = useState(true)
@@ -19,11 +28,13 @@ export default function App() {
   const [wrongQuestions, setWrongQuestions] = useState<WrongQuestion[]>([])
   const [scores, setScores] = useState<Score[]>([])
   const [wrongFilter, setWrongFilter] = useState<string>('全部')
+  const [coachPrefill, setCoachPrefill] = useState<{ subject: string; question: string } | null>(null)
   const [loadingDashboard, setLoadingDashboard] = useState(false)
   const [loadingWrong, setLoadingWrong] = useState(false)
   const [loadingScores, setLoadingScores] = useState(false)
   const [error, setError] = useState('')
   const [focusTask, setFocusTask] = useState<Task | null>(null)
+  const [restSessionOpen, setRestSessionOpen] = useState(false)
 
   const handleApiError = useCallback((reason: unknown, fallback: string) => {
     if (reason instanceof ApiError && reason.status === 401) {
@@ -156,6 +167,14 @@ export default function App() {
     setActiveTab('wrong')
   }
 
+  const handleNavigateToCoach = (item: WrongQuestion, prompt?: string) => {
+    setCoachPrefill({
+      subject: item.subject,
+      question: prompt || `关于错题《${item.title}》：请分步引导我重新理解与作答。`,
+    })
+    setActiveTab('coach')
+  }
+
   if (authLoading) return <div className="center-state">正在确认登录状态…</div>
   if (!user) return <LoginView onLogin={handleLogin} serviceError={error} />
 
@@ -169,6 +188,7 @@ export default function App() {
             data={dashboard}
             loading={loadingDashboard}
             onStartTask={setFocusTask}
+            onStartBreak={() => setRestSessionOpen(true)}
             onOpenWrongQuestions={handleOpenWrongQuestions}
             onCreateTask={handleCreateTask}
             onUpdateTask={handleUpdateTask}
@@ -193,15 +213,19 @@ export default function App() {
             onRefresh={loadWrongQuestions}
             onUpdateStatus={handleUpdateWrongQuestionStatus}
             onDelete={handleDeleteWrongQuestion}
+            onNavigateToCoach={handleNavigateToCoach}
           />
         ) : null}
         {activeTab === 'coach' && user.role === 'student' ? (
-          <CoachView />
+          <CoachView
+            initialSubject={coachPrefill?.subject}
+            initialQuestion={coachPrefill?.question}
+          />
         ) : null}
         {activeTab === 'scores' ? (
           <ScoresView scores={scores} loading={loadingScores} onScoreAdded={loadScores} />
         ) : null}
-        {activeTab === 'profile' ? <ProfileView user={user} onLogout={handleLogout} /> : null}
+        {activeTab === 'profile' ? <ProfileView user={user} onLogout={handleLogout} onUserUpdate={setUser} /> : null}
       </main>
       {focusTask ? (
         <FocusSession
@@ -212,6 +236,14 @@ export default function App() {
             setFocusTask(null)
             void loadDashboard()
           }}
+        />
+      ) : null}
+      {restSessionOpen ? (
+        <FocusSession
+          task={REST_TASK}
+          restOnly
+          onClose={() => setRestSessionOpen(false)}
+          onComplete={() => setRestSessionOpen(false)}
         />
       ) : null}
     </div>

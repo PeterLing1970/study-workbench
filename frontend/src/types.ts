@@ -4,6 +4,8 @@ export interface AuthUser {
   id: number
   username: string
   role: 'student' | 'parent'
+  display_name: string
+  grade: string
 }
 
 export interface Task {
@@ -12,6 +14,7 @@ export interface Task {
   title: string
   minutes: number
   completed: boolean
+  template_id: number | null
 }
 
 export interface SubjectSummary {
@@ -44,6 +47,8 @@ export interface WrongQuestion {
   review_count: number
   next_review_date: string | null
   is_demo: boolean
+  has_image?: boolean
+  image_url?: string | null
   created_at: string
 }
 
@@ -54,6 +59,8 @@ export interface Score {
   subject: string
   score: number
   full_score: number
+  class_rank: number | null
+  grade_rank: number | null
   is_demo: boolean
 }
 

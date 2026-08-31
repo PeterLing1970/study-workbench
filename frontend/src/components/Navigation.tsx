@@ -26,8 +26,7 @@ export function Navigation({ active, onChange, role }: NavigationProps) {
   return (
     <nav className="navigation" aria-label="主导航">
       <div className="desktop-brand">
-        <span>学习台</span>
-        <small>{role === 'parent' ? '家长只读视图' : '初三 AI 学习工作台'}</small>
+        <span>AI学习助手</span>
       </div>
       <div className={role === 'parent' ? 'nav-items nav-items-parent' : 'nav-items'}>
         {items.map(({ id, label, Icon }) => (

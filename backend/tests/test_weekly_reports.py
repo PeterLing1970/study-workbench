@@ -47,6 +47,7 @@ class WeeklyReportTruthTests(unittest.TestCase):
         self.db.add_all([
             StudyTask(task_date=week_start, subject="数学", title="练习", minutes=20, completed=True),
             StudyTask(task_date=week_start + timedelta(days=1), subject="英语", title="单词", minutes=15, completed=False),
+            StudyTask(task_date=week_start, subject="语文", title="已跳过", minutes=30, dismissed=True),
             FocusRecord(subject="数学", title="练习", actual_seconds=1500, pomodoros_completed=1, started_at=datetime(2026, 8, 31, 10)),
             WrongQuestion(subject="数学", title="本周错题", cause="计算步骤", review_status="已掌握", created_at=datetime(2026, 8, 31, 11)),
             WrongQuestion(subject="英语", title="上周错题", cause="词汇", review_status="待复习", created_at=datetime(2026, 8, 30, 11)),

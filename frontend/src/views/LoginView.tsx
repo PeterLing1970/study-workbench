@@ -31,7 +31,7 @@ export function LoginView({ onLogin, serviceError = '' }: LoginViewProps) {
       <section className="login-card" aria-labelledby="login-title">
         <div className="login-brand">
           <span className="login-mark">学</span>
-          <div><strong>学习台</strong><small>初三 · 中考复习模式</small></div>
+          <div><strong>AI学习助手</strong><small>智能错题 · 一对一辅导</small></div>
         </div>
 
         <div className="login-copy">
@@ -82,7 +82,7 @@ export function LoginView({ onLogin, serviceError = '' }: LoginViewProps) {
           {error || serviceError ? <p className="login-error" role="alert">{error || serviceError}</p> : null}
           <button className="login-submit" type="submit" disabled={submitting}>
             {submitting ? <LoaderCircle className="spin" size={20} /> : <LogIn size={20} />}
-            {submitting ? '正在登录…' : '登录学习台'}
+            {submitting ? '正在登录…' : '登录 AI学习助手'}
           </button>
         </form>
 

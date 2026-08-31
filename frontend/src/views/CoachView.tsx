@@ -1,21 +1,43 @@
-import { Bot, LoaderCircle, Send, Trash2, User } from 'lucide-react'
+import { Bot, BookOpen, BrainCircuit, LoaderCircle, Send, Trash2, User } from 'lucide-react'
 import { type FormEvent, useEffect, useRef, useState } from 'react'
-import ReactMarkdown from 'react-markdown'
 import { api } from '../api'
-import type { ChatMessage } from '../types'
+import { MathMarkdown } from '../components/MathMarkdown'
+import type { ChatMessage, WrongQuestion } from '../types'
+
+interface CoachViewProps {
+  initialSubject?: string
+  initialQuestion?: string
+}
 
 const subjects = ['全部', '数学', '物理', '化学', '语文', '英语', '道法', '历史']
+const agentOptions = [
+  { value: 'auto', label: '智能路由', description: 'MiniMax 主服务，DeepSeek 自动备用' },
+  { value: 'minimax', label: 'MiniMax M3', description: '适合综合讲解与图片题' },
+  { value: 'deepseek', label: 'DeepSeek', description: '适合数理推理与分步分析' },
+] as const
+type AgentChoice = typeof agentOptions[number]['value']
 
-export function CoachView() {
-  const [subject, setSubject] = useState('全部')
-  const [question, setQuestion] = useState('')
+export function CoachView({ initialSubject, initialQuestion }: CoachViewProps = {}) {
+  const [subject, setSubject] = useState(initialSubject || '全部')
+  const [question, setQuestion] = useState(initialQuestion || '')
   const [thought, setThought] = useState('')
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [loading, setLoading] = useState(false)
   const [loadingHistory, setLoadingHistory] = useState(true)
   const [confirmClear, setConfirmClear] = useState(false)
+  const [agentChoice, setAgentChoice] = useState<AgentChoice>('auto')
+  const [wrongQuestions, setWrongQuestions] = useState<WrongQuestion[]>([])
+  const [showWrongPicker, setShowWrongPicker] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    if (initialSubject) setSubject(initialSubject)
+    if (initialQuestion) {
+      setQuestion(initialQuestion)
+      setTimeout(() => textareaRef.current?.focus(), 100)
+    }
+  }, [initialSubject, initialQuestion])
 
   // Load chat history from backend
   const loadHistory = async (targetSubject: string) => {
@@ -54,6 +76,12 @@ export function CoachView() {
   }, [subject])
 
   useEffect(() => {
+    void api.wrongQuestions()
+      .then((items) => setWrongQuestions(items.filter((item) => !item.is_demo)))
+      .catch(() => setWrongQuestions([]))
+  }, [])
+
+  useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
@@ -89,7 +117,7 @@ export function CoachView() {
     setLoading(true)
 
     try {
-      const result = await api.coach(askSubject, q, thought.trim())
+      const result = await api.coach(askSubject, q, thought.trim(), agentChoice)
       const aiMsg: ChatMessage = {
         role: 'ai',
         content: result.answer,
@@ -113,6 +141,19 @@ export function CoachView() {
   const autoResize = (el: HTMLTextAreaElement) => {
     el.style.height = 'auto'
     el.style.height = Math.min(el.scrollHeight, 120) + 'px'
+  }
+
+  const importWrongQuestion = (item: WrongQuestion) => {
+    setSubject(item.subject)
+    setQuestion([
+      item.title,
+      `知识点：${item.knowledge_point}`,
+      `原错因：${item.cause}`,
+      item.ai_summary ? `已有分析：${item.ai_summary}` : '',
+      '请根据这道错题分步引导我重新理解和作答。',
+    ].filter(Boolean).join('\n'))
+    setShowWrongPicker(false)
+    textareaRef.current?.focus()
   }
 
   return (
@@ -149,6 +190,37 @@ export function CoachView() {
         ))}
       </div>
 
+      <div className="coach-tools-row">
+        <label className="agent-selector" htmlFor="coach-agent">
+          <BrainCircuit size={17} aria-hidden="true" />
+          <span>AI智能体</span>
+          <select id="coach-agent" value={agentChoice} onChange={(e) => setAgentChoice(e.target.value as AgentChoice)}>
+            {agentOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select>
+        </label>
+        <span className="agent-description">{agentOptions.find((option) => option.value === agentChoice)?.description}</span>
+        <button className="import-wrong-btn" type="button" onClick={() => setShowWrongPicker((value) => !value)}>
+          <BookOpen size={17} aria-hidden="true" /> 从错题导入
+        </button>
+      </div>
+
+      {showWrongPicker ? (
+        <section className="wrong-import-panel" aria-label="选择要导入的错题">
+          <strong>选择错题</strong>
+          {wrongQuestions.length > 0 ? (
+            <div className="wrong-import-list">
+              {wrongQuestions.map((item) => (
+                <button key={item.id} type="button" onClick={() => importWrongQuestion(item)}>
+                  <span>{item.subject}</span>
+                  <strong>{item.title}</strong>
+                  <small>{item.knowledge_point}</small>
+                </button>
+              ))}
+            </div>
+          ) : <p>还没有可导入的真实错题，请先到“错题”页面拍照或录入。</p>}
+        </section>
+      ) : null}
+
       <div className="chat-container">
         {loadingHistory ? (
           <div className="center-state compact">
@@ -176,7 +248,7 @@ export function CoachView() {
                     <span className={msg.demo ? 'chat-model demo' : 'chat-model'}>{msg.model}</span>
                   ) : null}
                   <div className="chat-text">
-                    <ReactMarkdown skipHtml>{msg.content}</ReactMarkdown>
+                    <MathMarkdown content={msg.content} />
                   </div>
                 </div>
               </div>

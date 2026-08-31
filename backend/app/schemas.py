@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -11,6 +12,7 @@ class TaskOut(BaseModel):
     title: str
     minutes: int
     completed: bool
+    template_id: int | None
 
 
 class SubjectSummary(BaseModel):
@@ -45,6 +47,8 @@ class WrongQuestionOut(BaseModel):
     review_count: int
     next_review_date: date | None
     is_demo: bool
+    has_image: bool = False
+    image_url: str | None = None
     created_at: datetime
 
 
@@ -54,6 +58,8 @@ class ScoreCreate(BaseModel):
     subject: str
     score: int = Field(ge=0)
     full_score: int = Field(gt=0)
+    class_rank: int | None = Field(default=None, ge=1, le=10000)
+    grade_rank: int | None = Field(default=None, ge=1, le=10000)
 
 
 class ScoreOut(ScoreCreate):
@@ -67,6 +73,7 @@ class AiCoachRequest(BaseModel):
     subject: str
     question: str = Field(min_length=2, max_length=6000)
     student_thought: str = Field(default="", max_length=6000)
+    provider: Literal["auto", "minimax", "deepseek"] = "auto"
 
 
 class AiCoachResponse(BaseModel):
@@ -87,6 +94,13 @@ class UserOut(BaseModel):
     id: int
     username: str
     role: str
+    display_name: str
+    grade: str
+
+
+class ProfileUpdate(BaseModel):
+    display_name: str | None = Field(default=None, max_length=40)
+    grade: str | None = Field(default=None, max_length=20)
 
 
 class TaskCreate(BaseModel):

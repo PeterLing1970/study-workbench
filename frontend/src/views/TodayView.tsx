@@ -1,4 +1,4 @@
-import { BellRing, CalendarDays, Camera, ChevronRight, Clock, Edit3, Flame, Lightbulb, LoaderCircle, Play, Plus, Trash2 } from 'lucide-react'
+import { BellRing, CalendarDays, Camera, ChevronRight, Coffee, Edit3, Flame, Lightbulb, LoaderCircle, Play, Plus, Repeat2, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { ProgressRing } from '../components/ProgressRing'
 import { SubjectIcon } from '../components/SubjectIcon'
@@ -10,6 +10,7 @@ interface TodayViewProps {
   data: DashboardData | null
   loading: boolean
   onStartTask: (task: Task) => void
+  onStartBreak: () => void
   onOpenWrongQuestions: (filter?: string) => void
   onCreateTask: (data: { subject: string; title: string; minutes: number }) => Promise<void>
   onUpdateTask: (id: number, data: { subject?: string; title?: string; minutes?: number }) => Promise<void>
@@ -26,12 +27,11 @@ function getGreeting(): string {
   return '晚上好'
 }
 
-const weekDay = new Intl.DateTimeFormat('zh-CN', { weekday: 'long' }).format(new Date())
-
 export function TodayView({
   data,
   loading,
   onStartTask,
+  onStartBreak,
   onOpenWrongQuestions,
   onCreateTask,
   onUpdateTask,
@@ -53,6 +53,11 @@ export function TodayView({
   }
 
   const nextTask = data.tasks.find((task) => !task.completed) ?? data.tasks[0]
+  const displayDate = new Intl.DateTimeFormat('zh-CN', {
+    month: 'long',
+    day: 'numeric',
+    weekday: 'long',
+  }).format(new Date(`${data.date}T00:00:00`))
 
   const handleDelete = async (taskId: number) => {
     setDeletingId(taskId)
@@ -67,10 +72,10 @@ export function TodayView({
     <section className="today-view" aria-labelledby="today-title">
       <header className="today-hero">
         <div className="hero-copy">
-          <h1 id="today-title">学习台</h1>
+          <h1 id="today-title">AI学习助手</h1>
           <p>{getGreeting()}，<br />今天按计划来</p>
           <div className="hero-meta-row">
-            <span className="today-date">{weekDay} · 中考复习</span>
+            <span className="today-date">{displayDate} · 中考复习</span>
             {data.today_focus_minutes > 0 ? (
               <span className="hero-focus-tag">
                 <Flame size={13} /> 今日已专注 {data.today_focus_minutes} 分钟
@@ -120,6 +125,10 @@ export function TodayView({
           <CalendarDays size={18} aria-hidden="true" />
           模板
         </button>
+        <button className="break-btn" type="button" onClick={onStartBreak}>
+          <Coffee size={18} aria-hidden="true" />
+          休息 5分钟
+        </button>
       </div>
 
       <section className="subject-panel" aria-labelledby="subject-heading">
@@ -127,6 +136,9 @@ export function TodayView({
           <h2 id="subject-heading">今日科目安排</h2>
           <span>{data.tasks.filter((task) => task.completed).length}/{data.tasks.length} 已完成</span>
         </div>
+        {data.tasks.some((task) => task.template_id !== null) ? (
+          <p className="template-task-note"><Repeat2 size={14} /> “循环”任务来自模板；删除只跳过今天，永久调整请进入“模板”。</p>
+        ) : null}
         <div className="subject-list">
           {data.tasks.map((task) => {
             const subjectInfo = data.subjects.find((s) => s.subject === task.subject)
@@ -137,6 +149,7 @@ export function TodayView({
                   <span className="subject-icon"><SubjectIcon subject={task.subject} /></span>
                   <span className="subject-copy">
                     <strong>{task.subject}</strong>
+                    {task.template_id !== null ? <span className="recurring-task-badge">循环</span> : null}
                     <small className={task.completed ? 'status-done' : ''}>
                       {task.completed ? '已完成' : `${task.title} · ${task.minutes}分钟`}
                     </small>

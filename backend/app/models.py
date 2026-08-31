@@ -16,6 +16,7 @@ class StudyTask(Base):
     title: Mapped[str] = mapped_column(String(160))
     minutes: Mapped[int] = mapped_column(Integer, default=20)
     completed: Mapped[bool] = mapped_column(Boolean, default=False)
+    dismissed: Mapped[bool] = mapped_column(Boolean, default=False)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
     template_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
@@ -60,6 +61,8 @@ class ExamScore(Base):
     subject: Mapped[str] = mapped_column(String(20), index=True)
     score: Mapped[int] = mapped_column(Integer)
     full_score: Mapped[int] = mapped_column(Integer)
+    class_rank: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, default=None)
+    grade_rank: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, default=None)
     is_demo: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
@@ -84,6 +87,8 @@ class User(Base):
     username: Mapped[str] = mapped_column(String(40), unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(256))
     role: Mapped[str] = mapped_column(String(20), default="student")
+    display_name: Mapped[str] = mapped_column(String(40), default="")
+    grade: Mapped[str] = mapped_column(String(20), default="初三")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     password_changed_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

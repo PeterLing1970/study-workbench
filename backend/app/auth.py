@@ -51,6 +51,10 @@ def ensure_user_role_schema(engine: Engine) -> None:
         columns = {column["name"] for column in inspect(connection).get_columns("users")}
         if "role" not in columns:
             connection.execute(text("ALTER TABLE users ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'student'"))
+        if "display_name" not in columns:
+            connection.execute(text("ALTER TABLE users ADD COLUMN display_name VARCHAR(40) NOT NULL DEFAULT ''"))
+        if "grade" not in columns:
+            connection.execute(text("ALTER TABLE users ADD COLUMN grade VARCHAR(20) NOT NULL DEFAULT '初三'"))
 
 
 def ensure_feature_schema(engine: Engine) -> None:
@@ -60,6 +64,25 @@ def ensure_feature_schema(engine: Engine) -> None:
         task_columns = {column["name"] for column in inspector.get_columns("study_tasks")}
         if "template_id" not in task_columns:
             connection.execute(text("ALTER TABLE study_tasks ADD COLUMN template_id INTEGER"))
+        if "dismissed" not in task_columns:
+            connection.execute(text("ALTER TABLE study_tasks ADD COLUMN dismissed BOOLEAN NOT NULL DEFAULT FALSE"))
+
+        # v0.4.2 starts with a genuinely empty plan. Remove only the exact
+        # built-in templates from older builds; user-created templates remain.
+        if inspector.has_table("task_templates"):
+            legacy_templates = """
+                (subject = '语文' AND title = '古诗默写' AND minutes = 20)
+                OR (subject = '英语' AND title = '单词打卡' AND minutes = 15)
+                OR (subject = '数学' AND title = '错题重做' AND minutes = 20)
+                OR (title = '学校作业' AND subject IN ('语文','数学','英语','物理','化学','道法','历史'))
+            """
+            connection.execute(text(f"""
+                UPDATE study_tasks SET dismissed = TRUE
+                WHERE completed = FALSE AND template_id IN (
+                    SELECT id FROM task_templates WHERE {legacy_templates}
+                )
+            """))
+            connection.execute(text(f"DELETE FROM task_templates WHERE {legacy_templates}"))
 
         wq_columns = {column["name"] for column in inspector.get_columns("wrong_questions")}
         if "review_count" not in wq_columns:
@@ -73,6 +96,10 @@ def ensure_feature_schema(engine: Engine) -> None:
         score_columns = {column["name"] for column in inspector.get_columns("exam_scores")}
         if "is_demo" not in score_columns:
             connection.execute(text("ALTER TABLE exam_scores ADD COLUMN is_demo BOOLEAN NOT NULL DEFAULT FALSE"))
+        if "class_rank" not in score_columns:
+            connection.execute(text("ALTER TABLE exam_scores ADD COLUMN class_rank INTEGER"))
+        if "grade_rank" not in score_columns:
+            connection.execute(text("ALTER TABLE exam_scores ADD COLUMN grade_rank INTEGER"))
         connection.execute(
             text("DELETE FROM exam_scores WHERE exam_name IN (:july_exam, :august_exam)"),
             {"july_exam": "七月期末摸底", "august_exam": "八月阶段测验"},
