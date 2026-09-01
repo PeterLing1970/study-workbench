@@ -140,20 +140,50 @@ proxy_set_header X-Forwarded-Proto $scheme;
 
 ## 备份
 
-执行：
+`backup` 服务会在 Compose 启动后立即备份一次，此后默认每 24 小时自动备份。每组备份包含：
+
+- `study-时间.dump`：PostgreSQL 自定义格式备份；
+- `uploads-时间.tar.gz`：错题原图；
+- `checksums-时间.sha256`：对应两份文件的 SHA-256 校验和。
+
+NAS 正式部署时，先创建项目目录之外的备份目录：
+
+```bash
+mkdir -p /vol1/1000/Backup/study-workbench
+chmod 700 /vol1/1000/Backup/study-workbench
+```
+
+并在 `.env` 中设置：
+
+```text
+BACKUP_HOST_DIR=/vol1/1000/Backup/study-workbench
+BACKUP_INTERVAL_SECONDS=86400
+BACKUP_RETRY_SECONDS=3600
+BACKUP_RETENTION_DAYS=30
+```
+
+启动或更新服务后检查第一次自动备份：
+
+```bash
+docker compose up -d --build
+docker compose logs --tail=50 backup
+ls -lah /vol1/1000/Backup/study-workbench
+```
+
+需要立即额外备份一次时执行：
 
 ```bash
 sh scripts/backup.sh
 ```
 
-输出位于 `data/backups`。建议再同步到另一块磁盘或其他设备。
+如果没有设置 `BACKUP_HOST_DIR`，备份会退回到 `data/backups`；这只适合开发测试，不应作为正式环境的唯一备份。建议同时为 NAS 备份目录开启快照或同步到另一块磁盘。
 
 恢复前先确认数据库和图片备份属于同一次备份，再执行：
 
 ```bash
 CONFIRM_RESTORE=YES sh scripts/restore.sh \
-  data/backups/study-YYYYMMDD-HHMMSS.dump \
-  data/backups/uploads-YYYYMMDD-HHMMSS.tar.gz
+  /vol1/1000/Backup/study-workbench/study-YYYYMMDD-HHMMSS.dump \
+  /vol1/1000/Backup/study-workbench/uploads-YYYYMMDD-HHMMSS.tar.gz
 ```
 
 恢复脚本会先为当前数据库和图片生成一份恢复前快照。建议每月至少做一次恢复演练，不能只确认“备份文件存在”。
@@ -166,4 +196,4 @@ docker compose up -d
 curl -fsS https://your-domain.example.com/api/health
 ```
 
-更新前先执行备份。确认新版本稳定后再人工清理旧镜像；不要把 `.env`、API密钥或数据库备份提交到代码仓库。
+更新前先执行一次手动备份。确认新版本稳定后再人工清理旧镜像；不要执行 `docker compose down -v`，也不要把 `.env`、API密钥或数据库备份提交到代码仓库。

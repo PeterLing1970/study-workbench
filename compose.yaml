@@ -73,6 +73,29 @@ services:
       - study_internal
       - study_public
 
+  backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      PGHOST: db
+      PGPORT: 5432
+      PGDATABASE: ${POSTGRES_DB:-study}
+      PGUSER: ${POSTGRES_USER:-study}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?请在.env中设置POSTGRES_PASSWORD}
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+      BACKUP_RETRY_SECONDS: ${BACKUP_RETRY_SECONDS:-3600}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
+    volumes:
+      - ${BACKUP_HOST_DIR:-./data/backups}:/backups
+      - ./data/uploads:/source/data/uploads:ro
+      - ./scripts/backup-container.sh:/usr/local/bin/backup-container.sh:ro
+    command: ["/bin/sh", "/usr/local/bin/backup-container.sh"]
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [study_internal]
+
   hermes:
     image: nousresearch/hermes-agent:latest
     profiles: ["hermes"]
