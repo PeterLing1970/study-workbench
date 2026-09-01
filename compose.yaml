@@ -1,0 +1,95 @@
+name: study-workbench
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-study}
+      POSTGRES_USER: ${POSTGRES_USER:-study}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?请在.env中设置POSTGRES_PASSWORD}
+      TZ: ${TZ:-Asia/Shanghai}
+    volumes:
+      - study_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-study} -d ${POSTGRES_DB:-study}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [study_internal]
+
+  api:
+    build: ./backend
+    restart: unless-stopped
+    user: "${PUID:-1000}:${PGID:-1000}"
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-study}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-study}
+      UPLOAD_DIR: /data/uploads
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-10}
+      SEED_DEMO_DATA: ${SEED_DEMO_DATA:-false}
+      AUTH_USERNAME: ${AUTH_USERNAME:-student}
+      AUTH_PASSWORD: ${AUTH_PASSWORD:?请在.env中设置AUTH_PASSWORD}
+      AUTH_PARENT_USERNAME: ${AUTH_PARENT_USERNAME:-parent}
+      AUTH_PARENT_PASSWORD: ${AUTH_PARENT_PASSWORD:?请在.env中设置AUTH_PARENT_PASSWORD}
+      AUTH_SECRET: ${AUTH_SECRET:?请在.env中设置AUTH_SECRET}
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
+      AUTH_SESSION_HOURS: ${AUTH_SESSION_HOURS:-168}
+      TRUSTED_ORIGINS: ${TRUSTED_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
+      AI_PRIMARY_PROVIDER: ${AI_PRIMARY_PROVIDER:-deepseek}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-v4-flash}
+      DEEPSEEK_REASONING_MODEL: ${DEEPSEEK_REASONING_MODEL:-deepseek-v4-pro}
+      DEEPSEEK_VISION_MODEL: ${DEEPSEEK_VISION_MODEL:-deepseek-v4-flash-vision-exp}
+      AI_VISION_PROVIDER: ${AI_VISION_PROVIDER:-deepseek}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_BASE_URL: ${GEMINI_BASE_URL:-https://generativelanguage.googleapis.com/v1beta/openai}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.7-flash}
+      AI_TIMEOUT_SECONDS: ${AI_TIMEOUT_SECONDS:-90}
+    volumes:
+      - ./data/uploads:/data/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health')"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+    networks:
+      - study_internal
+      - study_public
+
+  web:
+    build: ./frontend
+    restart: unless-stopped
+    ports:
+      - "${STUDY_PORT:-8787}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - study_internal
+      - study_public
+
+  hermes:
+    image: nousresearch/hermes-agent:latest
+    profiles: ["hermes"]
+    restart: unless-stopped
+    command: ["gateway", "run"]
+    volumes:
+      - ./data/hermes:/opt/data
+    expose:
+      - "8642"
+    networks:
+      - study_internal
+      - study_public
+
+volumes:
+  study_postgres:
+
+networks:
+  study_internal:
+    internal: true
+  study_public:
