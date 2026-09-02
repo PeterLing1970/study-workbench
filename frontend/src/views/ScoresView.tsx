@@ -64,7 +64,7 @@ export function ScoresView({ scores, loading, isParent, onScoreAdded }: ScoresVi
     e.preventDefault()
     const name = examName.trim()
     if (!name) { setFormError('请输入考试名称'); return }
-    const scoreNum = parseInt(score, 10)
+    const scoreNum = Number.parseFloat(score)
     if (isNaN(scoreNum) || scoreNum < 0) { setFormError('请输入有效分数'); return }
     if (scoreNum > fullScore) { setFormError(`${subject}满分为 ${fullScore}`); return }
     const classRankNum = classRank ? parseInt(classRank, 10) : null
@@ -208,7 +208,7 @@ export function ScoresView({ scores, loading, isParent, onScoreAdded }: ScoresVi
             </div>
             <div className="score-form-field">
               <label htmlFor="score-value">分数 <small>/ {fullScore}</small></label>
-              <input id="score-value" type="number" min={0} max={fullScore} value={score} onChange={(e) => setScore(e.target.value)} placeholder="0" required />
+              <input id="score-value" type="number" min={0} max={fullScore} step="0.1" inputMode="decimal" value={score} onChange={(e) => setScore(e.target.value)} placeholder="例如：93.5" required />
             </div>
           </div>
           <div className="score-form-row score-rank-row">

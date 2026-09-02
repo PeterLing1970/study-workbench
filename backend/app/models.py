@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from typing import Optional
 
-from sqlalchemy import Boolean, Date, DateTime, Integer, String, Text
+from sqlalchemy import Boolean, Date, DateTime, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .database import Base
@@ -59,7 +59,7 @@ class ExamScore(Base):
     exam_name: Mapped[str] = mapped_column(String(120))
     exam_date: Mapped[date] = mapped_column(Date)
     subject: Mapped[str] = mapped_column(String(20), index=True)
-    score: Mapped[int] = mapped_column(Integer)
+    score: Mapped[float] = mapped_column(Numeric(7, 2))
     full_score: Mapped[int] = mapped_column(Integer)
     class_rank: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, default=None)
     grade_rank: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, default=None)
