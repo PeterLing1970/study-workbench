@@ -56,7 +56,7 @@ class ScoreCreate(BaseModel):
     exam_name: str = Field(min_length=1, max_length=120)
     exam_date: date
     subject: str
-    score: int = Field(ge=0)
+    score: float = Field(ge=0)
     full_score: int = Field(gt=0)
     class_rank: int | None = Field(default=None, ge=1, le=10000)
     grade_rank: int | None = Field(default=None, ge=1, le=10000)
@@ -190,7 +190,7 @@ class ScoreTrendPoint(BaseModel):
     exam_name: str
     exam_date: date
     subject: str
-    score: int
+    score: float
     full_score: int
     percent: int
 

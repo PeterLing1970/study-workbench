@@ -94,6 +94,8 @@ def ensure_feature_schema(engine: Engine) -> None:
             connection.execute(text("UPDATE wrong_questions SET is_demo = TRUE WHERE title IN ('二次函数最值题', '串并联电路判断')"))
 
         score_columns = {column["name"] for column in inspector.get_columns("exam_scores")}
+        if connection.dialect.name == "postgresql":
+            connection.execute(text("ALTER TABLE exam_scores ALTER COLUMN score TYPE NUMERIC(7,2) USING score::numeric"))
         if "is_demo" not in score_columns:
             connection.execute(text("ALTER TABLE exam_scores ADD COLUMN is_demo BOOLEAN NOT NULL DEFAULT FALSE"))
         if "class_rank" not in score_columns:
