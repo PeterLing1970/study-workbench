@@ -35,7 +35,7 @@ services:
       AUTH_SECRET: ${AUTH_SECRET:?请在.env中设置AUTH_SECRET}
       AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
       AUTH_SESSION_HOURS: ${AUTH_SESSION_HOURS:-168}
-      TRUSTED_ORIGINS: ${TRUSTED_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
+      TRUSTED_ORIGINS: ${TRUSTED_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173,http://localhost:8787,http://127.0.0.1:8787}
       AI_PRIMARY_PROVIDER: ${AI_PRIMARY_PROVIDER:-deepseek}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
