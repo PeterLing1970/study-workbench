@@ -1,5 +1,5 @@
 import { type FormEvent, useState } from 'react'
-import { AlertCircle, ChevronDown, LineChart, LoaderCircle, Plus, Sparkles, TrendingUp, X } from 'lucide-react'
+import { AlertCircle, ChevronDown, LineChart, LoaderCircle, Pencil, Plus, Sparkles, Trash2, TrendingUp, X } from 'lucide-react'
 import { api } from '../api'
 import { ScoreTrendChart } from '../components/ScoreTrendChart'
 import type { Score } from '../types'
@@ -7,18 +7,22 @@ import type { Score } from '../types'
 interface ScoresViewProps {
   scores: Score[]
   loading: boolean
+  isParent: boolean
   onScoreAdded: () => Promise<void>
 }
 
 const SUBJECT_DEFAULT_FULL_SCORES: Record<string, number> = {
   '语文': 120, '数学': 120, '英语': 120,
   '道法': 100, '物理': 100, '化学': 100, '历史': 100, '体育': 40,
+  '总分': 0, // 满分不固定，录入时自由填写
 }
+const TOTAL_SUBJECT = '总分'
 const subjectList = Object.keys(SUBJECT_DEFAULT_FULL_SCORES)
 
-export function ScoresView({ scores, loading, onScoreAdded }: ScoresViewProps) {
+export function ScoresView({ scores, loading, isParent, onScoreAdded }: ScoresViewProps) {
   const [showForm, setShowForm] = useState(false)
   const [showTrend, setShowTrend] = useState(true)
+  const [editingId, setEditingId] = useState<number | null>(null)
   const [examName, setExamName] = useState('')
   const [examDate, setExamDate] = useState(new Date().toISOString().slice(0, 10))
   const [subject, setSubject] = useState('语文')
@@ -42,14 +46,16 @@ export function ScoresView({ scores, loading, onScoreAdded }: ScoresViewProps) {
   const activeScores = examGroups[activeExam || examKeys[0]] ?? scores
   const activeExamName = (activeExam || examKeys[0])?.split('|')[0] ?? '暂无考试'
 
-  const total = activeScores.reduce((sum, item) => sum + item.score, 0)
-  const fullTotal = activeScores.reduce((sum, item) => sum + item.full_score, 0)
+  const subjectScores = activeScores.filter((item) => item.subject !== TOTAL_SUBJECT)
+  const totalRow = activeScores.find((item) => item.subject === TOTAL_SUBJECT) ?? null
+  const total = subjectScores.reduce((sum, item) => sum + item.score, 0)
+  const fullTotal = subjectScores.reduce((sum, item) => sum + item.full_score, 0)
   const activeIsDemo = activeScores.some((item) => item.is_demo)
-  const activeClassRank = activeScores.find((item) => item.class_rank !== null)?.class_rank ?? null
-  const activeGradeRank = activeScores.find((item) => item.grade_rank !== null)?.grade_rank ?? null
+  const activeClassRank = totalRow?.class_rank ?? null
+  const activeGradeRank = totalRow?.grade_rank ?? null
 
-  // Diagnostics: find weak subjects (< 80% rate)
-  const weakSubjects = activeScores.filter((item) => {
+  // Diagnostics: find weak subjects (< 80% rate), excluding the total row
+  const weakSubjects = subjectScores.filter((item) => {
     const percent = Math.round((item.score / item.full_score) * 100)
     return percent < 80
   })
@@ -70,7 +76,7 @@ export function ScoresView({ scores, loading, onScoreAdded }: ScoresViewProps) {
     setFormError('')
     setFormSuccess('')
     try {
-      await api.addScore({
+      const payload = {
         exam_name: name,
         exam_date: examDate,
         subject,
@@ -78,21 +84,61 @@ export function ScoresView({ scores, loading, onScoreAdded }: ScoresViewProps) {
         full_score: fullScore,
         class_rank: classRankNum,
         grade_rank: gradeRankNum,
-      })
-      setFormSuccess(`${subject} ${scoreNum}分 已录入`)
-      setScore('')
-      // Move to next subject
-      const idx = subjectList.indexOf(subject)
-      if (idx < subjectList.length - 1) {
-        const nextSubject = subjectList[idx + 1]
-        setSubject(nextSubject)
-        setFullScore(SUBJECT_DEFAULT_FULL_SCORES[nextSubject])
+      }
+      if (editingId !== null) {
+        await api.updateScore(editingId, payload)
+        setFormSuccess(`${subject} ${scoreNum}分 已更新`)
+        setEditingId(null)
+      } else {
+        await api.addScore(payload)
+        setFormSuccess(`${subject} ${scoreNum}分 已录入`)
+        setScore('')
+        // Move to next subject
+        const idx = subjectList.indexOf(subject)
+        if (idx < subjectList.length - 1) {
+          const nextSubject = subjectList[idx + 1]
+          setSubject(nextSubject)
+          setFullScore(SUBJECT_DEFAULT_FULL_SCORES[nextSubject])
+        }
       }
       await onScoreAdded()
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : '录入失败')
+      setFormError(err instanceof Error ? err.message : '保存失败')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const startEdit = (item: Score) => {
+    setEditingId(item.id)
+    setExamName(item.exam_name)
+    setExamDate(item.exam_date)
+    setSubject(item.subject)
+    setFullScore(item.full_score)
+    setScore(String(item.score))
+    setClassRank(item.class_rank !== null ? String(item.class_rank) : '')
+    setGradeRank(item.grade_rank !== null ? String(item.grade_rank) : '')
+    setFormError('')
+    setFormSuccess('')
+    setShowForm(true)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const cancelEdit = () => {
+    setEditingId(null)
+    setShowForm(false)
+    setFormError('')
+    setFormSuccess('')
+  }
+
+  const handleDelete = async (item: Score) => {
+    if (!window.confirm(`确定删除「${item.exam_name} · ${item.subject} ${item.score}分」这条成绩吗？此操作不可恢复。`)) return
+    try {
+      await api.deleteScore(item.id)
+      setFormSuccess(`已删除 ${item.subject} 成绩`)
+      await onScoreAdded()
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : '删除失败')
     }
   }
 
@@ -103,7 +149,7 @@ export function ScoresView({ scores, loading, onScoreAdded }: ScoresViewProps) {
           <h1 id="scores-title">成绩与分析</h1>
           <p>程序负责准确计算，可视化追踪学科走势并进行弱科诊断。</p>
         </div>
-        <button className="add-score-btn" type="button" onClick={() => setShowForm(!showForm)}>
+        <button className="add-score-btn" type="button" onClick={() => (showForm ? cancelEdit() : setShowForm(true))}>
           {showForm ? <X size={18} /> : <Plus size={18} />}
           {showForm ? '收起' : '录入成绩'}
         </button>
@@ -111,6 +157,10 @@ export function ScoresView({ scores, loading, onScoreAdded }: ScoresViewProps) {
 
       {showForm ? (
         <form className="score-form" onSubmit={handleSubmit}>
+          <h3 className="score-form-title">
+            {editingId !== null ? `编辑 ${subject} 成绩` : '录入成绩'}
+          </h3>
+          {editingId !== null ? <p className="form-note">修改后点击「保存修改」生效；考试名称与日期变更后会归入新的考试分组。</p> : null}
           <div className="score-form-row">
             <div className="score-form-field">
               <label htmlFor="exam-name">考试名称</label>
@@ -134,14 +184,27 @@ export function ScoresView({ scores, loading, onScoreAdded }: ScoresViewProps) {
             </div>
             <div className="score-form-field">
               <label htmlFor="score-full-score">满分</label>
-              <select id="score-full-score" value={fullScore} onChange={(e) => setFullScore(Number(e.target.value))}>
-                {subject === '体育' ? <option value={40}>40 分</option> : (
-                  <>
-                    <option value={100}>100 分</option>
-                    <option value={120}>120 分</option>
-                  </>
-                )}
-              </select>
+              {subject === TOTAL_SUBJECT ? (
+                <input
+                  id="score-full-score"
+                  type="number"
+                  min={1}
+                  max={2000}
+                  value={fullScore || ''}
+                  onChange={(e) => setFullScore(Number(e.target.value))}
+                  placeholder="例如：680"
+                  required
+                />
+              ) : (
+                <select id="score-full-score" value={fullScore} onChange={(e) => setFullScore(Number(e.target.value))}>
+                  {subject === '体育' ? <option value={40}>40 分</option> : (
+                    <>
+                      <option value={100}>100 分</option>
+                      <option value={120}>120 分</option>
+                    </>
+                  )}
+                </select>
+              )}
             </div>
             <div className="score-form-field">
               <label htmlFor="score-value">分数 <small>/ {fullScore}</small></label>
@@ -158,8 +221,8 @@ export function ScoresView({ scores, loading, onScoreAdded }: ScoresViewProps) {
               <input id="grade-rank" type="number" min={1} max={10000} step={1} value={gradeRank} onChange={(e) => setGradeRank(e.target.value)} placeholder="例如：28" />
             </div>
             <button className="score-form-submit" type="submit" disabled={saving}>
-              {saving ? <LoaderCircle className="spin" size={16} /> : <Plus size={16} />}
-              录入
+              {saving ? <LoaderCircle className="spin" size={16} /> : editingId !== null ? <Pencil size={16} /> : <Plus size={16} />}
+              {editingId !== null ? (saving ? '保存中…' : '保存修改') : (saving ? '录入中…' : '录入')}
             </button>
           </div>
           {formError ? <p className="form-error" role="alert">{formError}</p> : null}
@@ -234,7 +297,7 @@ export function ScoresView({ scores, loading, onScoreAdded }: ScoresViewProps) {
 
       {scores.length > 0 ? <div className="section-heading-row list-heading">
         <h2>科目明细</h2>
-        <span>{activeScores.length} 科</span>
+        <span>{subjectScores.length} 科{totalRow ? ' + 总分' : ''}</span>
       </div> : null}
 
       {loading ? (
@@ -244,16 +307,35 @@ export function ScoresView({ scores, loading, onScoreAdded }: ScoresViewProps) {
           {activeScores.map((item) => {
             const percent = Math.round((item.score / item.full_score) * 100)
             const isWeak = percent < 80
+            const isTotal = item.subject === TOTAL_SUBJECT
+            const rankBadge = item.class_rank !== null || item.grade_rank !== null ? (
+              <span className="score-rank-badge">
+                {item.class_rank !== null ? `班级第 ${item.class_rank} 名` : null}
+                {item.class_rank !== null && item.grade_rank !== null ? ' · ' : null}
+                {item.grade_rank !== null ? `年级第 ${item.grade_rank} 名` : null}
+              </span>
+            ) : null
             return (
-              <div className="score-row" key={item.id}>
+              <div className={`score-row ${isTotal ? 'total-row' : ''}`} key={item.id}>
                 <div className="score-row-heading">
                   <div className="score-row-title">
-                    <strong>{item.subject}</strong>
+                    <strong>{item.subject}{isTotal ? <b className="total-label">本次考试总分</b> : null}</strong>
                     {isWeak ? <span className="score-weak-pill"><AlertCircle size={12} /> 提升重点</span> : null}
                   </div>
-                  <span>{item.score} / {item.full_score} ({percent}%)</span>
+                  <span className={isTotal ? 'total-score' : ''}>{item.score} / {item.full_score} ({percent}%)</span>
                 </div>
-                <div className={`score-bar ${isWeak ? 'bar-weak' : ''}`}><span style={{ width: `${percent}%` }} /></div>
+                <div className={`score-bar ${isWeak ? 'bar-weak' : ''} ${isTotal ? 'bar-total' : ''}`}><span style={{ width: `${percent}%` }} /></div>
+                {rankBadge}
+                {!isParent ? (
+                  <div className="score-row-actions">
+                    <button type="button" className="score-action-btn" onClick={() => startEdit(item)} title="编辑这条成绩">
+                      <Pencil size={14} /> 编辑
+                    </button>
+                    <button type="button" className="score-action-btn danger" onClick={() => handleDelete(item)} title="删除这条成绩">
+                      <Trash2 size={14} /> 删除
+                    </button>
+                  </div>
+                ) : null}
               </div>
             )
           })}

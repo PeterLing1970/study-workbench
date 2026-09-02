@@ -73,7 +73,7 @@ class AiCoachRequest(BaseModel):
     subject: str
     question: str = Field(min_length=2, max_length=6000)
     student_thought: str = Field(default="", max_length=6000)
-    provider: Literal["auto", "minimax", "deepseek", "deepseek_flash", "deepseek_pro"] = "auto"
+    provider: Literal["auto", "deepseek", "deepseek_flash", "deepseek_pro", "gemini"] = "auto"
 
 
 class AiCoachResponse(BaseModel):

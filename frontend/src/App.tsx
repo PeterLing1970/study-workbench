@@ -223,7 +223,7 @@ export default function App() {
           />
         ) : null}
         {activeTab === 'scores' ? (
-          <ScoresView scores={scores} loading={loadingScores} onScoreAdded={loadScores} />
+          <ScoresView scores={scores} loading={loadingScores} isParent={user.role === 'parent'} onScoreAdded={loadScores} />
         ) : null}
         {activeTab === 'profile' ? <ProfileView user={user} onLogout={handleLogout} onUserUpdate={setUser} /> : null}
       </main>

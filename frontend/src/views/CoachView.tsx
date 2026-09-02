@@ -11,10 +11,10 @@ interface CoachViewProps {
 
 const subjects = ['全部', '数学', '物理', '化学', '语文', '英语', '道法', '历史']
 const agentOptions = [
-  { value: 'auto', label: '智能路由', description: 'MiniMax 主服务，DeepSeek V4 Flash 自动备用' },
-  { value: 'minimax', label: 'MiniMax M3', description: '适合综合讲解与图片题' },
+  { value: 'auto', label: '智能路由', description: 'DeepSeek 主服务，失败时自动切换备用模型' },
   { value: 'deepseek_flash', label: 'DeepSeek V4 Flash', description: '响应更快，适合日常答疑与快速讲解' },
   { value: 'deepseek_pro', label: 'DeepSeek V4 Pro', description: '能力更强，适合复杂数理推理与分步分析' },
+  { value: 'gemini', label: 'Gemini 3.7 Flash', description: '多模态识别强，适合图片题与文档理解' },
 ] as const
 type AgentChoice = typeof agentOptions[number]['value']
 

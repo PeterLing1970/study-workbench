@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from app.database import Base
 from app.auth import ensure_feature_schema
 from app.ai import provider_candidates
-from app.main import add_score, compute_next_review, generate_tasks_from_templates, has_valid_image_signature, update_wrong_question
+from app.main import add_score, compute_next_review, delete_score, generate_tasks_from_templates, has_valid_image_signature, score_trend, update_score, update_wrong_question
 from app.models import StudyTask, TaskTemplate, WrongQuestion
 from app.schemas import ScoreCreate, WrongQuestionUpdate
 
@@ -125,39 +125,59 @@ class UploadValidationTests(unittest.TestCase):
 
 
 class AiProviderSelectionTests(unittest.TestCase):
-    def test_explicit_provider_disables_automatic_fallback(self) -> None:
-        settings = SimpleNamespace(
-            minimax_base_url="https://example.invalid/minimax",
-            minimax_api_key="minimax-key",
-            minimax_model="MiniMax-M3",
+    @staticmethod
+    def make_settings(**overrides) -> SimpleNamespace:
+        base = dict(
             deepseek_base_url="https://example.invalid/deepseek",
             deepseek_api_key="deepseek-key",
-            deepseek_model="deepseek-chat",
-            deepseek_reasoning_model="deepseek-reasoner",
-            ai_primary_provider="minimax",
+            deepseek_model="deepseek-v4-flash",
+            deepseek_reasoning_model="deepseek-v4-pro",
+            deepseek_vision_model="deepseek-v4-flash-vision-exp",
+            gemini_base_url="https://example.invalid/gemini",
+            gemini_api_key="gemini-key",
+            gemini_model="gemini-3.7-flash",
+            ai_primary_provider="deepseek",
+            ai_vision_provider="deepseek",
         )
+        base.update(overrides)
+        return SimpleNamespace(**base)
+
+    def test_explicit_provider_disables_automatic_fallback(self) -> None:
+        settings = self.make_settings()
 
         candidates = provider_candidates(settings, preferred_provider="deepseek")
 
         self.assertEqual([candidate.name for candidate in candidates], ["deepseek"])
 
     def test_deepseek_v4_models_can_be_selected_explicitly(self) -> None:
-        settings = SimpleNamespace(
-            minimax_base_url="https://example.invalid/minimax",
-            minimax_api_key="minimax-key",
-            minimax_model="MiniMax-M3",
-            deepseek_base_url="https://example.invalid/deepseek",
-            deepseek_api_key="deepseek-key",
-            deepseek_model="deepseek-v4-flash",
-            deepseek_reasoning_model="deepseek-v4-pro",
-            ai_primary_provider="minimax",
-        )
+        settings = self.make_settings(deepseek_model="deepseek-v4-flash", deepseek_reasoning_model="deepseek-v4-pro")
 
         flash = provider_candidates(settings, preferred_provider="deepseek_flash")
         pro = provider_candidates(settings, preferred_provider="deepseek_pro")
 
         self.assertEqual([candidate.model for candidate in flash], ["deepseek-v4-flash"])
         self.assertEqual([candidate.model for candidate in pro], ["deepseek-v4-pro"])
+
+    def test_vision_uses_ai_vision_provider_first_with_fallback(self) -> None:
+        settings = self.make_settings(ai_vision_provider="deepseek")
+
+        candidates = provider_candidates(settings, vision=True)
+
+        self.assertEqual([candidate.model for candidate in candidates], ["deepseek-v4-flash-vision-exp", "gemini-3.7-flash"])
+
+    def test_vision_preferred_provider_overrides_default(self) -> None:
+        settings = self.make_settings(ai_vision_provider="deepseek")
+
+        candidates = provider_candidates(settings, vision=True, preferred_provider="gemini")
+
+        self.assertEqual([candidate.model for candidate in candidates], ["gemini-3.7-flash"])
+
+    def test_vision_skips_providers_without_api_key(self) -> None:
+        settings = self.make_settings(ai_vision_provider="gemini", gemini_api_key="")
+
+        candidates = provider_candidates(settings, vision=True)
+
+        self.assertEqual([candidate.model for candidate in candidates], ["deepseek-v4-flash-vision-exp"])
 
 
 class ScoreFullScoreTests(unittest.TestCase):
@@ -186,6 +206,145 @@ class ScoreFullScoreTests(unittest.TestCase):
             _current_user=None,
         )
         self.assertEqual(saved.full_score, 40)
+
+
+class ScoreTotalRankTests(unittest.TestCase):
+    """总分记录：满分自由（1-2000），可存班级/年级排名，且不进趋势图。"""
+
+    def setUp(self) -> None:
+        self.engine = create_engine("sqlite+pysqlite:///:memory:")
+        Base.metadata.create_all(self.engine)
+        self.db = Session(self.engine)
+
+    def tearDown(self) -> None:
+        self.db.close()
+        self.engine.dispose()
+
+    def test_total_subject_accepts_arbitrary_full_score_with_ranks(self) -> None:
+        saved = add_score(
+            ScoreCreate(
+                exam_name="九月月考", exam_date=date(2026, 9, 1),
+                subject="总分", score=560, full_score=680,
+                class_rank=5, grade_rank=28,
+            ),
+            db=self.db,
+            _current_user=None,
+        )
+        self.assertEqual(saved.full_score, 680)
+        self.assertEqual(saved.class_rank, 5)
+        self.assertEqual(saved.grade_rank, 28)
+
+    def test_total_subject_rejects_out_of_range_full_score(self) -> None:
+        from fastapi import HTTPException
+
+        with self.assertRaises(HTTPException) as context:
+            add_score(
+                ScoreCreate(exam_name="九月月考", exam_date=date(2026, 9, 1), subject="总分", score=100, full_score=3000),
+                db=self.db,
+                _current_user=None,
+            )
+        self.assertEqual(context.exception.status_code, 400)
+        self.assertIn("总分满分应在 1-2000 之间", str(context.exception.detail))
+
+    def test_total_subject_score_cannot_exceed_full_score(self) -> None:
+        from fastapi import HTTPException
+
+        with self.assertRaises(HTTPException) as context:
+            add_score(
+                ScoreCreate(exam_name="九月月考", exam_date=date(2026, 9, 1), subject="总分", score=690, full_score=680),
+                db=self.db,
+                _current_user=None,
+            )
+        self.assertEqual(context.exception.status_code, 400)
+        self.assertIn("成绩不能超过满分", str(context.exception.detail))
+
+    def test_score_trend_excludes_total_rows(self) -> None:
+        add_score(
+            ScoreCreate(exam_name="九月月考", exam_date=date(2026, 9, 1), subject="数学", score=88, full_score=120),
+            db=self.db,
+            _current_user=None,
+        )
+        add_score(
+            ScoreCreate(exam_name="九月月考", exam_date=date(2026, 9, 1), subject="总分", score=560, full_score=680),
+            db=self.db,
+            _current_user=None,
+        )
+        points = score_trend(db=self.db, _current_user=None)
+        self.assertEqual([point.subject for point in points], ["数学"])
+
+
+class ScoreEditDeleteTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.engine = create_engine("sqlite+pysqlite:///:memory:")
+        Base.metadata.create_all(self.engine)
+        self.db = Session(self.engine)
+
+    def tearDown(self) -> None:
+        self.db.close()
+        self.engine.dispose()
+
+    def test_update_score_modifies_fields_and_keeps_is_demo(self) -> None:
+        saved = add_score(
+            ScoreCreate(exam_name="九月月考", exam_date=date(2026, 9, 1), subject="数学", score=88, full_score=120),
+            db=self.db,
+            _current_user=None,
+        )
+        saved.is_demo = True  # 模拟演示数据标记
+        self.db.commit()
+
+        updated = update_score(
+            saved.id,
+            ScoreCreate(exam_name="九月月考", exam_date=date(2026, 9, 1), subject="数学", score=95, full_score=120, class_rank=3),
+            db=self.db,
+            _current_user=None,
+        )
+
+        self.assertEqual(updated.score, 95)
+        self.assertEqual(updated.class_rank, 3)
+        self.assertTrue(updated.is_demo)  # 演示标记不被编辑覆盖
+
+    def test_update_score_validates_full_score(self) -> None:
+        saved = add_score(
+            ScoreCreate(exam_name="九月月考", exam_date=date(2026, 9, 1), subject="数学", score=88, full_score=120),
+            db=self.db,
+            _current_user=None,
+        )
+        with self.assertRaises(Exception) as context:
+            update_score(
+                saved.id,
+                ScoreCreate(exam_name="九月月考", exam_date=date(2026, 9, 1), subject="数学", score=88, full_score=150),
+                db=self.db,
+                _current_user=None,
+            )
+        self.assertIn("满分应为", str(context.exception))
+
+    def test_update_score_missing_record_raises_404(self) -> None:
+        from fastapi import HTTPException
+
+        with self.assertRaises(HTTPException) as context:
+            update_score(
+                9999,
+                ScoreCreate(exam_name="不存在", exam_date=date(2026, 9, 1), subject="数学", score=88, full_score=120),
+                db=self.db,
+                _current_user=None,
+            )
+        self.assertEqual(context.exception.status_code, 404)
+
+    def test_delete_score_removes_record(self) -> None:
+        saved = add_score(
+            ScoreCreate(exam_name="九月月考", exam_date=date(2026, 9, 1), subject="数学", score=88, full_score=120),
+            db=self.db,
+            _current_user=None,
+        )
+        delete_score(saved.id, db=self.db, _current_user=None)
+        self.assertIsNone(self.db.get(type(saved), saved.id))
+
+    def test_delete_score_missing_record_raises_404(self) -> None:
+        from fastapi import HTTPException
+
+        with self.assertRaises(HTTPException) as context:
+            delete_score(9999, db=self.db, _current_user=None)
+        self.assertEqual(context.exception.status_code, 404)
 
 
 class SpacedRepetitionTests(unittest.TestCase):

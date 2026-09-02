@@ -87,6 +87,7 @@ export function LoginView({ onLogin, serviceError = '' }: LoginViewProps) {
         </form>
 
         <p className="login-note">学生和家长使用各自账号，均由家庭管理员在 NAS 中设置。</p>
+        <p className="login-version">v0.6.2</p>
       </section>
     </main>
   )

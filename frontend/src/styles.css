@@ -69,6 +69,7 @@ button { color: inherit; }
 .login-submit:hover { background: var(--coral-dark); }
 .login-submit:disabled { cursor: wait; opacity: 0.72; }
 .login-note { margin: 24px 0 0; color: #999b9c; font-size: 11px; line-height: 1.55; text-align: center; }
+.login-version { margin: 10px 0 0; color: #c0bdb9; font-size: 11px; text-align: center; }
 
 .app-shell {
   min-height: 100vh;
@@ -1577,7 +1578,6 @@ button { color: inherit; }
   font-size: 11.5px;
   color: #777;
 }
-.print-output-only { display: none; }
 .empty-print-state {
   display: flex;
   flex-direction: column;
@@ -1595,39 +1595,18 @@ button { color: inherit; }
 }
 
 @media print {
-  html,
-  body,
-  #root,
-  .app-shell,
-  .app-main,
-  .wq-view-container {
-    width: 100% !important;
-    min-height: 0 !important;
-    height: 0 !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    overflow: visible !important;
-    background: white !important;
-  }
   body * {
     visibility: hidden;
-  }
-  .wq-view-container > :not(.print-modal-overlay) {
-    display: none !important;
   }
   .no-print, .navigation, .app-header, .upload-panel, .wq-filter-control-panel, .list-heading {
     display: none !important;
   }
   .print-modal-overlay {
-    display: block !important;
     position: static !important;
     background: transparent !important;
     padding: 0 !important;
-    animation: none !important;
-    backdrop-filter: none !important;
   }
   .print-modal-sheet {
-    display: block !important;
     position: static !important;
     max-width: 100% !important;
     max-height: none !important;
@@ -1636,8 +1615,6 @@ button { color: inherit; }
     border: none !important;
     box-shadow: none !important;
     background: transparent !important;
-    animation: none !important;
-    transform: none !important;
   }
   .printable-paper-wrapper {
     background: transparent !important;
@@ -1647,9 +1624,9 @@ button { color: inherit; }
     visibility: visible !important;
   }
   .printable-paper {
-    position: absolute !important;
-    left: 0 !important;
-    top: 0 !important;
+    position: absolute;
+    left: 0;
+    top: 0;
     width: 100% !important;
     min-height: auto !important;       /* 屏幕预览用的是 297mm，打印别再加一层 */
     margin: 0 !important;
@@ -1659,76 +1636,28 @@ button { color: inherit; }
     background: white !important;
   }
   .paper-question-card {
-    break-inside: auto !important;
     page-break-inside: auto !important;
-  }
-  .print-preview-only { display: none !important; }
-  .print-output-only { display: block !important; }
-  .paper-header {
-    padding-bottom: 10px;
-    margin-bottom: 16px;
-  }
-  .paper-meta-top {
-    gap: 16px;
-    margin-bottom: 9px;
-    font-size: 10.5pt;
-  }
-  .paper-title { font-size: 18pt; }
-  .paper-questions-list { gap: 18px; }
-  .paper-question-card { padding-bottom: 16px; }
-  .paper-q-image-box {
-    max-width: 100%;
-    margin: 8px auto 12px;
-    text-align: center;
-  }
-  .paper-q-image { max-height: 82mm; }
-  .paper-answer-blank {
-    min-height: 56mm;
-    margin-top: 12px;
-  }
-  .paper-footer {
-    margin-top: 18px;
-    padding-top: 10px;
-  }
-  .paper-question-card + .paper-question-card {
-    break-before: page;
-    page-break-before: always;
+    break-inside: auto !important;
   }
   .paper-header,
   .paper-q-header,
   .paper-q-title,
-  .paper-review-tags,
-  .paper-answer-blank,
+  .paper-review-tags {
+    break-after: avoid-page;
+    page-break-after: avoid;
+  }
   .paper-q-image-box,
+  .paper-answer-blank,
   .paper-review-content table,
   .paper-review-content blockquote,
-  .paper-review-content .katex-display {
-    break-inside: avoid;
+  .paper-review-content pre,
+  .paper-review-content li {
+    break-inside: avoid-page;
+    page-break-inside: avoid;
   }
-  .paper-q-header,
-  .paper-q-title,
-  .paper-review-tags {
-    break-after: avoid;
-  }
-  .paper-review-content,
-  .paper-summary-snippet {
-    font-size: 10.5pt;
-    line-height: 1.55;
-  }
-  .paper-review-content p,
-  .paper-review-content ul,
-  .paper-review-content ol,
-  .paper-summary-snippet p {
-    margin-bottom: 6px;
-  }
-  .paper-review-content table {
-    margin: 7px 0 10px;
-    font-size: 9.5pt;
-    line-height: 1.4;
-  }
-  .paper-review-content th,
-  .paper-review-content td {
-    padding: 5px 7px;
+  .paper-footer {
+    break-before: avoid-page;
+    page-break-before: avoid;
   }
 }
 
@@ -1892,10 +1821,36 @@ button { color: inherit; }
 .score-list { overflow: hidden; border: 1px solid var(--line); border-radius: 17px; background: var(--surface); }
 .score-row { padding: 14px 16px; border-bottom: 1px solid var(--line); }
 .score-row:last-child { border-bottom: 0; }
+.score-row.total-row { background: #fbf7f2; box-shadow: inset 3px 0 0 var(--coral); }
 .score-row-heading { display: flex; align-items: center; justify-content: space-between; font-size: 14px; }
 .score-row-heading span { color: var(--muted); }
+.total-label { display: inline-block; margin-left: 8px; padding: 1px 7px; border-radius: 6px; background: #f3e2da; color: var(--coral-dark); font-size: 11px; font-weight: 700; }
+.total-score { color: var(--coral-dark) !important; font-weight: 700; }
+.score-rank-badge { display: inline-block; margin-top: 8px; padding: 3px 9px; border-radius: 7px; background: #eef4fb; color: var(--blue); font-size: 12px; font-weight: 600; }
+.score-row.total-row .score-rank-badge { background: #f7e9e2; color: var(--coral-dark); }
 .score-bar { height: 6px; margin-top: 9px; overflow: hidden; border-radius: 6px; background: #ece9e6; }
 .score-bar span { display: block; height: 100%; border-radius: inherit; background: var(--coral); }
+.score-bar.bar-total span { background: linear-gradient(90deg, var(--coral), #e8a78f); }
+
+.score-row-actions { display: flex; gap: 8px; margin-top: 10px; }
+.score-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.score-action-btn:hover { border-color: var(--blue); color: var(--blue); }
+.score-action-btn.danger:hover { border-color: var(--coral); color: var(--coral-dark); background: #fdf1ee; }
+
+.score-form-title { margin: 0 0 4px; font-size: 15px; }
+.form-note { margin: 0 0 12px; color: var(--muted); font-size: 12px; }
 
 /* ── Profile & Focus Stats ── */
 .profile-card { display: flex; align-items: center; gap: 14px; margin-top: 24px; padding: 20px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); }
@@ -2303,6 +2258,99 @@ button.parent-insight { cursor: pointer; }
 }
 .modal-submit:hover { background: var(--coral-dark); }
 .modal-submit:disabled { opacity: 0.6; cursor: wait; }
+
+/* ── Full-page question cropper ── */
+.crop-modal-overlay { align-items: center; }
+.crop-modal-sheet {
+  width: min(100%, 760px);
+  max-height: 92vh;
+  padding-top: 24px;
+}
+.crop-modal-heading { display: flex; align-items: flex-start; gap: 12px; padding-right: 28px; }
+.crop-modal-heading h2 { margin-bottom: 5px; }
+.crop-modal-heading .modal-subtitle { margin-bottom: 14px; }
+.crop-modal-icon {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 12px;
+  background: #fff0eb;
+  color: var(--coral);
+}
+.crop-stage {
+  position: relative;
+  width: fit-content;
+  max-width: 100%;
+  max-height: 61vh;
+  margin: 0 auto;
+  overflow: hidden;
+  border: 1px solid #d9d3ce;
+  border-radius: 12px;
+  background: #292522;
+  line-height: 0;
+  cursor: crosshair;
+  touch-action: none;
+  user-select: none;
+}
+.crop-stage img {
+  display: block;
+  max-width: 100%;
+  max-height: 61vh;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  user-select: none;
+  pointer-events: none;
+}
+.crop-stage-hint {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  padding: 8px 12px;
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+  background: rgba(30, 28, 26, 0.78);
+  color: white;
+  font-size: 13px;
+  line-height: 1.4;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.crop-selection {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px solid #ff7058;
+  background: rgba(255, 112, 88, 0.12);
+  /* 多区域框选时保留整页可见，避免后绘制的选区遮暗前面的选区。 */
+  pointer-events: none;
+}
+.crop-selection span {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  padding: 3px 7px;
+  border-radius: 6px;
+  background: #ff7058;
+  color: white;
+  font-size: 11px;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+.crop-modal-actions { display: flex; gap: 10px; margin-top: 14px; }
+.crop-modal-actions .btn-cancel { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.crop-use-original {
+  display: block;
+  margin: 12px auto 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.crop-use-original:hover { color: var(--blue); }
 
 /* ── Wrong Question Detail ── */
 .wq-detail-sheet { text-align: left; }
@@ -2856,4 +2904,55 @@ button.parent-insight { cursor: pointer; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation-duration: 0.01ms !important; }
+}
+
+/* Must stay last: later modal and desktop rules otherwise re-center the PDF output. */
+@media print {
+  html,
+  body,
+  #root,
+  .app-shell,
+  .app-main,
+  .wq-view-container {
+    display: block !important;
+    width: 100% !important;
+    min-height: 0 !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: white !important;
+  }
+  .wq-view-container > :not(.print-modal-overlay) {
+    display: none !important;
+  }
+  .print-modal-overlay {
+    display: block !important;
+    position: static !important;
+    inset: auto !important;
+    width: 100% !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    align-items: initial !important;
+    animation: none !important;
+    backdrop-filter: none !important;
+  }
+  .print-modal-sheet,
+  .printable-paper-wrapper {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    margin: 0 !important;
+    animation: none !important;
+    transform: none !important;
+  }
+  .printable-paper {
+    position: static !important;
+    left: auto !important;
+    top: auto !important;
+  }
 }

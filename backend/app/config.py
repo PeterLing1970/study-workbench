@@ -20,16 +20,19 @@ class Settings(BaseSettings):
     auth_cookie_name: str = "study_session"
     auth_cookie_secure: bool = False
     auth_session_hours: int = Field(default=168, ge=1, le=720)
-    trusted_origins: str = "https://study.rostai.top,http://localhost:5173,http://127.0.0.1:5173"
+    trusted_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 
-    ai_primary_provider: str = "minimax"
-    minimax_api_key: str = ""
-    minimax_base_url: str = "https://api.minimaxi.com/v1"
-    minimax_model: str = "MiniMax-M3"
+    ai_primary_provider: str = "deepseek"
+    # 错题拍照识别使用的视觉模型：deepseek（deepseek-v4-flash-vision-exp）| gemini
+    ai_vision_provider: str = "deepseek"
     deepseek_api_key: str = ""
     deepseek_base_url: str = "https://api.deepseek.com"
     deepseek_model: str = "deepseek-v4-flash"
     deepseek_reasoning_model: str = "deepseek-v4-pro"
+    deepseek_vision_model: str = "deepseek-v4-flash-vision-exp"
+    gemini_api_key: str = ""
+    gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai"
+    gemini_model: str = "gemini-3.7-flash"
     ai_timeout_seconds: int = 90
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")

@@ -35,15 +35,17 @@ services:
       AUTH_SECRET: ${AUTH_SECRET:?请在.env中设置AUTH_SECRET}
       AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
       AUTH_SESSION_HOURS: ${AUTH_SESSION_HOURS:-168}
-      TRUSTED_ORIGINS: ${TRUSTED_ORIGINS:-https://study.rostai.top,http://localhost:5173,http://127.0.0.1:5173}
-      AI_PRIMARY_PROVIDER: ${AI_PRIMARY_PROVIDER:-minimax}
-      MINIMAX_API_KEY: ${MINIMAX_API_KEY:-}
-      MINIMAX_BASE_URL: ${MINIMAX_BASE_URL:-https://api.minimaxi.com/v1}
-      MINIMAX_MODEL: ${MINIMAX_MODEL:-MiniMax-M3}
+      TRUSTED_ORIGINS: ${TRUSTED_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173,http://localhost:8787,http://127.0.0.1:8787}
+      AI_PRIMARY_PROVIDER: ${AI_PRIMARY_PROVIDER:-deepseek}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
       DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-v4-flash}
       DEEPSEEK_REASONING_MODEL: ${DEEPSEEK_REASONING_MODEL:-deepseek-v4-pro}
+      DEEPSEEK_VISION_MODEL: ${DEEPSEEK_VISION_MODEL:-deepseek-v4-flash-vision-exp}
+      AI_VISION_PROVIDER: ${AI_VISION_PROVIDER:-deepseek}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_BASE_URL: ${GEMINI_BASE_URL:-https://generativelanguage.googleapis.com/v1beta/openai}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.7-flash}
       AI_TIMEOUT_SECONDS: ${AI_TIMEOUT_SECONDS:-90}
     volumes:
       - ./data/uploads:/data/uploads
@@ -70,6 +72,29 @@ services:
     networks:
       - study_internal
       - study_public
+
+  backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      PGHOST: db
+      PGPORT: 5432
+      PGDATABASE: ${POSTGRES_DB:-study}
+      PGUSER: ${POSTGRES_USER:-study}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?请在.env中设置POSTGRES_PASSWORD}
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+      BACKUP_RETRY_SECONDS: ${BACKUP_RETRY_SECONDS:-3600}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
+    volumes:
+      - ${BACKUP_HOST_DIR:-./data/backups}:/backups
+      - ./data/uploads:/source/data/uploads:ro
+      - ./scripts/backup-container.sh:/usr/local/bin/backup-container.sh:ro
+    command: ["/bin/sh", "/usr/local/bin/backup-container.sh"]
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [study_internal]
 
   hermes:
     image: nousresearch/hermes-agent:latest

@@ -139,9 +139,9 @@ export function ProfileView({ user, onLogout, onUserUpdate }: ProfileViewProps) 
       ) : null}
 
       <div className="settings-list">
-        <div><Bot aria-hidden="true" /><span><strong>AI服务</strong><small>MiniMax M3、DeepSeek V4 Flash / Pro</small></span></div>
+        <div><Bot aria-hidden="true" /><span><strong>AI服务</strong><small>DeepSeek V4 Flash / Pro、Gemini 3.7 Flash</small></span></div>
         <div><Database aria-hidden="true" /><span><strong>学习数据</strong><small>PostgreSQL 是正式记录来源</small></span></div>
-        <div><HardDrive aria-hidden="true" /><span><strong>家庭存储</strong><small>错题图片保存在飞牛NAS</small></span></div>
+        <div><HardDrive aria-hidden="true" /><span><strong>家庭存储</strong><small>错题图片保存在 NAS</small></span></div>
         <div><ShieldCheck aria-hidden="true" /><span><strong>隐私与权限</strong><small>{isParent ? '家长账号只能查看，不能修改学习记录' : '学生账号可记录任务、错题和成绩'}</small></span></div>
       </div>
 
@@ -149,7 +149,7 @@ export function ProfileView({ user, onLogout, onUserUpdate }: ProfileViewProps) 
         <LogOut size={18} aria-hidden="true" />退出登录
       </button>
 
-      <p className="version-note">AI学习助手 v0.4.3 · 家庭内测版</p>
+      <p className="version-note">AI学习助手 v0.6.2 · 家庭内测版</p>
 
       {showWeeklyReport ? (
         <WeeklyReportModal onClose={() => setShowWeeklyReport(false)} />

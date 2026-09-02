@@ -105,6 +105,20 @@ export const api = {
       body: JSON.stringify(data),
     }),
   scoreTrend: () => request<ScoreTrendPoint[]>('/api/scores/trend'),
+  updateScore: (id: number, data: {
+    exam_name: string
+    exam_date: string
+    subject: string
+    score: number
+    full_score: number
+    class_rank: number | null
+    grade_rank: number | null
+  }) => request<Score>(`/api/scores/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  }),
+  deleteScore: (id: number) => request<void>(`/api/scores/${id}`, { method: 'DELETE' }),
 
   // Focus
   saveFocusRecord: (data: { task_id?: number; subject: string; title: string; planned_seconds: number; actual_seconds: number; pomodoros_completed: number }) =>
@@ -116,7 +130,7 @@ export const api = {
   focusStats: () => request<FocusStats>('/api/focus-records/stats'),
 
   // AI Coach & Chat History
-  coach: (subject: string, question: string, studentThought: string, provider: 'auto' | 'minimax' | 'deepseek_flash' | 'deepseek_pro') =>
+  coach: (subject: string, question: string, studentThought: string, provider: 'auto' | 'deepseek_flash' | 'deepseek_pro' | 'gemini') =>
     request<{ provider: string; model: string; demo: boolean; answer: string }>('/api/ai/coach', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

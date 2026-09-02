@@ -227,7 +227,7 @@ async def lifespan(_: FastAPI):
 
 trusted_origins = {origin.strip().rstrip("/") for origin in settings.trusted_origins.split(",") if origin.strip()}
 
-app = FastAPI(title=settings.app_name, version="0.4.3", lifespan=lifespan)
+app = FastAPI(title=settings.app_name, version="0.6.2", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=sorted(trusted_origins),
@@ -617,14 +617,20 @@ async def create_wrong_question(
     provider = "demo"
     model = "not-configured"
     try:
-        analysis, provider, model = await analyze_wrong_question(settings, destination, image.content_type, subject)
-    except AiUnavailable:
+        analysis, provider, model = await analyze_wrong_question(
+            settings,
+            destination,
+            image.content_type,
+            subject,
+            preferred_provider=settings.ai_vision_provider,
+        )
+    except AiUnavailable as exc:
         demo = True
         analysis = {
             "title": f"{subject}拍照错题",
             "knowledge_point": "待人工确认",
-            "cause": "计算步骤",
-            "summary": "图片已保存。配置 MiniMax API 后会自动识别题目、知识点和错因。",
+            "cause": "待人工确认",
+            "summary": f"图片已保存，但 AI 未生成可用的结构化分析：{exc}",
         }
 
     item = WrongQuestion(
@@ -657,20 +663,29 @@ def scores(
     return list(db.scalars(select(ExamScore).order_by(desc(ExamScore.exam_date), ExamScore.subject)))
 
 
+def validate_score_payload(payload: ScoreCreate) -> None:
+    if payload.subject not in SUBJECT_FULL_SCORES:
+        raise HTTPException(status_code=400, detail="未知科目")
+    if payload.subject == "总分":
+        # 总分满分各校不同，允许 1-2000 任意值
+        if not 1 <= payload.full_score <= 2000:
+            raise HTTPException(status_code=400, detail="总分满分应在 1-2000 之间")
+    else:
+        allowed_full_scores = {40} if payload.subject == "体育" else {100, 120}
+        if payload.full_score not in allowed_full_scores:
+            choices = " 或 ".join(str(value) for value in sorted(allowed_full_scores))
+            raise HTTPException(status_code=400, detail=f"{payload.subject}满分应为 {choices}")
+    if payload.score > payload.full_score:
+        raise HTTPException(status_code=400, detail="成绩不能超过满分")
+
+
 @app.post("/api/scores", response_model=ScoreOut)
 def add_score(
     payload: ScoreCreate,
     db: Session = Depends(get_db),
     _current_user: User = Depends(require_student),
 ) -> ExamScore:
-    if payload.subject not in SUBJECT_FULL_SCORES:
-        raise HTTPException(status_code=400, detail="未知科目")
-    allowed_full_scores = {40} if payload.subject == "体育" else {100, 120}
-    if payload.full_score not in allowed_full_scores:
-        choices = " 或 ".join(str(value) for value in sorted(allowed_full_scores))
-        raise HTTPException(status_code=400, detail=f"{payload.subject}满分应为 {choices}")
-    if payload.score > payload.full_score:
-        raise HTTPException(status_code=400, detail="成绩不能超过满分")
+    validate_score_payload(payload)
     score = ExamScore(**payload.model_dump())
     db.add(score)
     db.commit()
@@ -678,13 +693,48 @@ def add_score(
     return score
 
 
+@app.put("/api/scores/{score_id}", response_model=ScoreOut)
+def update_score(
+    score_id: int,
+    payload: ScoreCreate,
+    db: Session = Depends(get_db),
+    _current_user: User = Depends(require_student),
+) -> ExamScore:
+    score = db.get(ExamScore, score_id)
+    if score is None:
+        raise HTTPException(status_code=404, detail="成绩记录不存在")
+    validate_score_payload(payload)
+    for field, value in payload.model_dump().items():
+        setattr(score, field, value)
+    db.commit()
+    db.refresh(score)
+    return score
+
+
+@app.delete("/api/scores/{score_id}", status_code=204)
+def delete_score(
+    score_id: int,
+    db: Session = Depends(get_db),
+    _current_user: User = Depends(require_student),
+) -> None:
+    score = db.get(ExamScore, score_id)
+    if score is None:
+        raise HTTPException(status_code=404, detail="成绩记录不存在")
+    db.delete(score)
+    db.commit()
+
+
 @app.get("/api/scores/trend", response_model=list[ScoreTrendPoint])
 def score_trend(
     db: Session = Depends(get_db),
     _current_user: User = Depends(require_user),
 ) -> list[ScoreTrendPoint]:
-    """Return all scores as trend points for charting."""
-    rows = list(db.scalars(select(ExamScore).order_by(ExamScore.exam_date, ExamScore.subject)))
+    """Return all scores as trend points for charting (excluding total rows)."""
+    rows = list(db.scalars(
+        select(ExamScore)
+        .where(ExamScore.subject != "总分")
+        .order_by(ExamScore.exam_date, ExamScore.subject)
+    ))
     return [
         ScoreTrendPoint(
             exam_name=s.exam_name,
@@ -770,8 +820,8 @@ async def ai_coach(
         "除非学生明确要求并已经展示思路，否则不要直接给最终答案。表达简洁、鼓励但不夸张。"
     )
     user_prompt = f"科目：{payload.subject}\n题目：{payload.question}\n学生思路：{payload.student_thought or '未填写'}"
-    provider = "minimax"
-    model = "MiniMax-M3"
+    provider = "deepseek"
+    model = "deepseek-v4-flash"
     demo = False
     try:
         answer, provider, model = await request_chat(

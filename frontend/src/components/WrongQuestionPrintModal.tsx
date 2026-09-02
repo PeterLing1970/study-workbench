@@ -196,12 +196,9 @@ export function WrongQuestionPrintModal({
                     {/* Question Content / Solution Content depending on mode */}
                     {printMode === 'practice' ? (
                       <div className="paper-practice-area">
-                        {/* Preserve the v0.4.3 on-screen preview; use the stricter extraction only on paper. */}
-                        <div className="paper-summary-snippet print-preview-only">
+                        {/* If AI summary contains original question text, we can show it */}
+                        <div className="paper-summary-snippet">
                           <MathMarkdown content={extractQuestionOnly(item.ai_summary)} />
-                        </div>
-                        <div className="paper-summary-snippet print-output-only">
-                          <MathMarkdown content={extractQuestionForPrint(item.ai_summary)} />
                         </div>
                         <div className="paper-answer-blank">
                           <div className="answer-grid-lines">
@@ -247,20 +244,4 @@ function extractQuestionOnly(fullText: string): string {
     return parts[0].trim()
   }
   return fullText
-}
-
-function extractQuestionForPrint(fullText: string): string {
-  if (!fullText) return ''
-
-  const diagnosisIndex = fullText.search(/(?:🩺\s*)?错因深度诊断/)
-  const questionSection = diagnosisIndex >= 0 ? fullText.slice(0, diagnosisIndex) : fullText
-  const originalQuestion = questionSection.match(
-    /(?:\*\*)?原题重现(?:\*\*)?\s*[：:]\s*([\s\S]*)$/
-  )
-
-  if (originalQuestion?.[1]?.trim()) return originalQuestion[1].trim()
-
-  if (diagnosisIndex >= 0 || /基础信息|满分标准解析|错因/.test(fullText)) return ''
-
-  return fullText.trim()
 }

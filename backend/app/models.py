@@ -103,7 +103,7 @@ class AiChatMessage(Base):
     student_thought: Mapped[str] = mapped_column(Text, default="")
     answer: Mapped[str] = mapped_column(Text)
     model: Mapped[str] = mapped_column(String(80), default="")
-    provider: Mapped[str] = mapped_column(String(40), default="minimax")
+    provider: Mapped[str] = mapped_column(String(40), default="deepseek")
     demo: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
 

@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { type ChangeEvent, useRef, useState } from 'react'
 import { api } from '../api'
+import { ImageCropModal } from '../components/ImageCropModal'
 import { WrongQuestionDetail } from '../components/WrongQuestionDetail'
 import { WrongQuestionPrintModal } from '../components/WrongQuestionPrintModal'
 import type { WrongQuestion } from '../types'
@@ -58,6 +59,7 @@ export function WrongQuestionsView({
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploadSubject, setUploadSubject] = useState('数学')
   const [uploading, setUploading] = useState(false)
+  const [pendingFile, setPendingFile] = useState<File | null>(null)
   const [message, setMessage] = useState('')
   const [selectedItem, setSelectedItem] = useState<WrongQuestion | null>(null)
   const [statusFilter, setStatusFilter] = useState<string>(initialFilter ?? '全部')
@@ -68,25 +70,30 @@ export function WrongQuestionsView({
 
   const today = new Date().toISOString().slice(0, 10)
 
-  const handleFile = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
+  const uploadFile = async (file: File) => {
     setUploading(true)
     setMessage('')
     try {
       const result = await api.analyzeWrongQuestion(uploadSubject, file)
       setMessage(
         result.demo
-          ? '图片已保存；配置AI密钥后将自动深度分析。'
-          : `已由 ${result.model} 完成深度整理与 LaTeX 公式排版。`
+          ? '图片已保存，但AI暂未生成可用分析，请稍后重试。'
+          : `已由 ${result.model} 完成深度整理与 LaTeX 公式排版。`,
       )
       await onRefresh()
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '上传失败，请重试')
     } finally {
       setUploading(false)
-      event.target.value = ''
     }
+  }
+
+  const handleFile = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    setMessage('')
+    setPendingFile(file)
+    event.target.value = ''
   }
 
   const dueItemsCount = items.filter(
@@ -419,6 +426,16 @@ export function WrongQuestionsView({
           onClose={() => {
             setIsPrintModalOpen(false)
             setPrintSelectedId(null)
+          }}
+        />
+      ) : null}
+      {pendingFile ? (
+        <ImageCropModal
+          file={pendingFile}
+          onCancel={() => setPendingFile(null)}
+          onConfirm={(file) => {
+            setPendingFile(null)
+            void uploadFile(file)
           }}
         />
       ) : null}
