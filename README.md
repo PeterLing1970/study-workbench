@@ -1,6 +1,6 @@
 # AI 学习工作台
 
-当前版本：**v0.6.2**。面向手机、iPad 和电脑的家庭学习工作台，包含学生/家长双角色、任务与循环模板、独立休息计时、专注记录、艾宾浩斯错题复习、八科成绩趋势、可选 AI 智能体、错题导入辅导与真实数据周报。
+当前版本：**v0.6.2**。面向手机、iPad 和电脑的家庭学习工作台，包含学生/家长双角色、任务与循环模板、独立休息计时、专注记录、艾宾浩斯错题复习、八科成绩趋势、可选 AI 智能体、错题导入辅导与真实数据周报。整页错题照片支持先框选单个或多个区域，再交给 AI 识别跨栏题目。
 
 ## 运行架构
 
@@ -36,7 +36,7 @@ AUTH_PARENT_USERNAME=家长登录账号
 AUTH_PARENT_PASSWORD=至少12位的家长密码
 AUTH_SECRET=至少32位的随机会话密钥
 AUTH_COOKIE_SECURE=true
-TRUSTED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+TRUSTED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173,http://localhost:8787,http://127.0.0.1:8787
 SEED_DEMO_DATA=false
 DEEPSEEK_API_KEY=你的DeepSeek API Key（可暂时留空）
 ```
