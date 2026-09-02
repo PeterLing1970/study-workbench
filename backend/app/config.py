@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     trusted_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 
     ai_primary_provider: str = "deepseek"
-    # 错题拍照识别使用的视觉模型：deepseek（deepseek-v4-flash-vision-exp）| gemini
+    # 错题拍照识别使用的视觉模型：deepseek | gemini | openai
     ai_vision_provider: str = "deepseek"
     deepseek_api_key: str = ""
     deepseek_base_url: str = "https://api.deepseek.com"
@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai"
     gemini_model: str = "gemini-3.7-flash"
+    openai_api_key: str = ""
+    openai_base_url: str = "https://api.openai.com/v1"
+    openai_model: str = "gpt-5.6-luna"
+    openai_vision_model: str = "gpt-5.6-luna"
     ai_timeout_seconds: int = 90
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")

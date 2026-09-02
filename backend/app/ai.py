@@ -134,7 +134,13 @@ def provider_candidates(
             api_key=settings.gemini_api_key,
             model=settings.gemini_model,
         )
-        by_name = {"deepseek": deepseek_vision, "gemini": gemini}
+        openai = ProviderConfig(
+            name="openai",
+            base_url=settings.openai_base_url,
+            api_key=settings.openai_api_key,
+            model=settings.openai_vision_model,
+        )
+        by_name = {"deepseek": deepseek_vision, "gemini": gemini, "openai": openai}
         if preferred_provider in by_name:
             ordered = [by_name[preferred_provider]]
         else:
@@ -145,7 +151,13 @@ def provider_candidates(
         return [provider for provider in ordered if provider.api_key]
 
     deepseek = deepseek_pro if reasoning else deepseek_flash
-    if preferred_provider in {"deepseek", "deepseek_flash", "deepseek_pro", "gemini"}:
+    openai = ProviderConfig(
+        name="openai",
+        base_url=settings.openai_base_url,
+        api_key=settings.openai_api_key,
+        model=settings.openai_model,
+    )
+    if preferred_provider in {"deepseek", "deepseek_flash", "deepseek_pro", "gemini", "openai"}:
         if preferred_provider == "deepseek_pro":
             ordered = [deepseek_pro]
         elif preferred_provider == "deepseek_flash":
@@ -158,6 +170,8 @@ def provider_candidates(
                 model=settings.gemini_model,
             )
             ordered = [gemini]
+        elif preferred_provider == "openai":
+            ordered = [openai]
         else:
             ordered = [deepseek]
     else:
@@ -169,6 +183,8 @@ def provider_candidates(
                 model=settings.gemini_model,
             )
             ordered = [gemini, deepseek]
+        elif settings.ai_primary_provider == "openai":
+            ordered = [openai, deepseek]
         else:
             ordered = [deepseek]
     return [provider for provider in ordered if provider.api_key]
